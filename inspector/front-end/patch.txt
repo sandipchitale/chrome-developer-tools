@@ -1,0 +1,182 @@
+diff --git a/Source/WebCore/inspector/front-end/ObjectPropertiesSection.js b/Source/WebCore/inspector/front-end/ObjectPropertiesSection.js
+index f4abe3a..7d9e996 100644
+--- a/Source/WebCore/inspector/front-end/ObjectPropertiesSection.js
++++ b/Source/WebCore/inspector/front-end/ObjectPropertiesSection.js
+@@ -95,6 +95,21 @@ WebInspector.ObjectPropertiesSection.prototype = {
+ 
+     updateProperties: function(properties, rootTreeElementConstructor, rootPropertyComparer)
+     {
++        // Delete the cached last descriptions of all propertyIdentifiers
++        // did were not preset when the debugee was suspended last time
++        if (this.pane && this.pane._lastDescriptions && this.pane._propertyIdentifiers)
++            for (var pi in this.pane._lastDescriptions) {
++                if (!(pi in this.pane._propertyIdentifiers))
++                    // Delete the properties that no longer exist
++                    delete this.pane._lastDescriptions[pi];
++            }
++
++        // start with empty propertyIdentifiers cache
++        // this will get populated as the tree elemnts are
++        // shown
++        if (this.pane)
++           this.pane._propertyIdentifiers  = {};
++
+         if (!rootTreeElementConstructor)
+             rootTreeElementConstructor = this.treeElementConstructor;
+ 
+@@ -206,6 +221,10 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
+ 
+     onattach: function()
+     {
++        // record the propertyIdentifier
++        if (this.propertyIdentifier && this.treeOutline.section.pane && this.treeOutline.section.pane._propertyIdentifiers)
++            this.treeOutline.section.pane._propertyIdentifiers[this.propertyIdentifier] = 1;
++
+         this.update();
+     },
+ 
+@@ -224,7 +243,40 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
+         this.valueElement = document.createElement("span");
+         this.valueElement.className = "value";
+ 
++        // detect if the propertyIdentifier was shown when the debugee was suspended last time
++        var hadProperty = true;
++        if (this.propertyIdentifier && this.treeOutline.section && this.treeOutline.section.pane)
++            // not a first suspension
++            if (this.treeOutline.section.pane._lastDescriptions)
++                hadProperty = (this.treeOutline.section.pane._lastDescriptions[this.propertyIdentifier] != undefined);
++            else {
++                // first suspension
++                this.treeOutline.section.pane._lastDescriptions = {};
++                hadProperty = false;
++            }
++
++        var oldDescription;
++
++        if (this.propertyIdentifier && this.treeOutline.section && this.treeOutline.section.pane && this.treeOutline.section.pane._lastDescriptions)
++            // retrieve the description from last suspension
++            oldDescription = this.treeOutline.section.pane._lastDescriptions[this.propertyIdentifier];
++
++        // description now
+         var description = this.property.value.description;
++        var type = this.property.value.type;
++
++        // determine if it has it changed only if description is initialized
++        // this handles the case when the variable came into scope but
++        // was not initialized
++        var descriptionChanged = false;
++        if (hadProperty)
++            descriptionChanged = ((type + " " + description) != oldDescription);
++        else
++            descriptionChanged = true;
++
++        if (this.propertyIdentifier && this.treeOutline.section && this.treeOutline.section.pane && this.treeOutline.section.pane._lastDescriptions)
++            this.treeOutline.section.pane._lastDescriptions[this.propertyIdentifier] = (type + " " + description);
++
+         // Render \n as a nice unicode cr symbol.
+         if (this.property.wasThrown)
+             this.valueElement.textContent = "[Exception: " + description + "]";
+@@ -237,6 +289,13 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
+         } else if (this.property.value.type !== "object" || this.property.value.subtype !== "node") 
+             this.valueElement.textContent = description;
+ 
++        if (descriptionChanged) {
++            this.valueElement.addStyleClass("webkit-search-result");
++            if (!hadProperty)
++                // new - highlight name also
++                this.nameElement.addStyleClass("webkit-search-result");
++        }
++
+         if (this.property.wasThrown)
+             this.valueElement.addStyleClass("error");
+         if (this.property.value.subtype)
+diff --git a/Source/WebCore/inspector/front-end/WatchExpressionsSidebarPane.js b/Source/WebCore/inspector/front-end/WatchExpressionsSidebarPane.js
+index 1a50986..6347658 100644
+--- a/Source/WebCore/inspector/front-end/WatchExpressionsSidebarPane.js
++++ b/Source/WebCore/inspector/front-end/WatchExpressionsSidebarPane.js
+@@ -37,6 +37,11 @@ WebInspector.WatchExpressionsSidebarPane = function()
+     WebInspector.SidebarPane.call(this, WebInspector.UIString("Watch Expressions"));
+ 
+     this.section = new WebInspector.WatchExpressionsSection();
++    this.section.pane = this;
++
++    this._expandedExpressions = {};
++    this._expandedProperties = {};
++
+     this.bodyElement.appendChild(this.section.element);
+ 
+     var refreshButton = document.createElement("button");
+@@ -113,8 +118,6 @@ WebInspector.WatchExpressionsSection = function()
+     WebInspector.ObjectPropertiesSection.call(this, WebInspector.RemoteObject.fromPrimitiveValue(""));
+ 
+     this.treeElementConstructor = WebInspector.WatchedPropertyTreeElement;
+-    this._expandedExpressions = {};
+-    this._expandedProperties = {};
+ 
+     this.emptyElement = document.createElement("div");
+     this.emptyElement.className = "info";
+@@ -348,19 +351,28 @@ WebInspector.WatchExpressionTreeElement.prototype = {
+     onexpand: function()
+     {
+         WebInspector.ObjectPropertyTreeElement.prototype.onexpand.call(this);
+-        this.treeOutline.section._expandedExpressions[this._expression()] = true;
++        this.treeOutline.section.pane._expandedExpressions[this._expression()] = true;
+     },
+ 
+     oncollapse: function()
+     {
+         WebInspector.ObjectPropertyTreeElement.prototype.oncollapse.call(this);
+-        delete this.treeOutline.section._expandedExpressions[this._expression()];
++        delete this.treeOutline.section.pane._expandedExpressions[this._expression()];
++    },
++
++    get propertyIdentifier()
++    {
++        if ("_propertyIdentifier" in this)
++            return this._propertyIdentifier;
++        var section = this.treeOutline.section;
++        this._propertyIdentifier = section.title + ":" + (section.subtitle ? section.subtitle + ":" : "") + this.propertyPath();
++        return this._propertyIdentifier;
+     },
+ 
+     onattach: function()
+     {
+         WebInspector.ObjectPropertyTreeElement.prototype.onattach.call(this);
+-        if (this.treeOutline.section._expandedExpressions[this._expression()])
++        if (this.treeOutline.section.pane._expandedExpressions[this._expression()])
+             this.expanded = true;
+     },
+ 
+@@ -470,20 +482,29 @@ WebInspector.WatchedPropertyTreeElement.prototype = {
+     onattach: function()
+     {
+         WebInspector.ObjectPropertyTreeElement.prototype.onattach.call(this);
+-        if (this.hasChildren && this.propertyPath() in this.treeOutline.section._expandedProperties)
++        if (this.hasChildren && this.propertyPath() in this.treeOutline.section.pane._expandedProperties)
+             this.expand();
+     },
+ 
+     onexpand: function()
+     {
+         WebInspector.ObjectPropertyTreeElement.prototype.onexpand.call(this);
+-        this.treeOutline.section._expandedProperties[this.propertyPath()] = true;
++        this.treeOutline.section.pane._expandedProperties[this.propertyPath()] = true;
+     },
+ 
+     oncollapse: function()
+     {
+         WebInspector.ObjectPropertyTreeElement.prototype.oncollapse.call(this);
+-        delete this.treeOutline.section._expandedProperties[this.propertyPath()];
++        delete this.treeOutline.section.pane._expandedProperties[this.propertyPath()];
++    },
++
++    get propertyIdentifier()
++    {
++        if ("_propertyIdentifier" in this)
++            return this._propertyIdentifier;
++        var section = this.treeOutline.section;
++        this._propertyIdentifier = section.title + ":" + (section.subtitle ? section.subtitle + ":" : "") + this.propertyPath();
++        return this._propertyIdentifier;
+     },
+ 
+     __proto__: WebInspector.ObjectPropertyTreeElement.prototype
