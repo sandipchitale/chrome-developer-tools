@@ -39,8 +39,8 @@ WebInspector.WatchExpressionsSidebarPane = function()
     this.section = new WebInspector.WatchExpressionsSection();
     this.section.pane = this;
 
-    this._expandedExpressions = {};
-    this._expandedProperties = {};
+    this._expandedExpressions = new Set();
+    this._expandedProperties = new Set();
 
     this.bodyElement.appendChild(this.section.element);
 
@@ -215,8 +215,8 @@ WebInspector.WatchExpressionsSection.prototype = {
         if (!propertyCount) {
             this.element.appendChild(this.emptyElement);
             this.propertiesTreeOutline.removeChildren();
-            this._expandedExpressions.clear();
-            this._expandedProperties.clear();
+            this.pane._expandedExpressions.clear();
+            this.pane._expandedProperties.clear();
         } else {
             this.emptyElement.remove();
         }
