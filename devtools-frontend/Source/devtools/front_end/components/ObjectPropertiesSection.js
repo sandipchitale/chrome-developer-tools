@@ -243,17 +243,19 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
             // description now
             var description = this.property.value.description;
 
+            var descriptionToCompare = (type + ":" +
+                (subtype? subtype : "") + ":" + /* (this.property.value.objectId ? this.property.value.objectId : "") + ":" + */ description);
             // determine if it has it changed only if description is initialized
             // this handles the case when the variable came into scope but
             // was not initialized
             var descriptionChanged = false;
             if (hadProperty)
-                descriptionChanged = ((type + " " + description) != oldDescription);
+                descriptionChanged = (descriptionToCompare != oldDescription);
             else
                 descriptionChanged = true;
 
             if (this.propertyIdentifier && this.treeOutline.section && this.treeOutline.section.pane && this.treeOutline.section.pane._lastDescriptions)
-                this.treeOutline.section.pane._lastDescriptions[this.propertyIdentifier] = (type + " " + description);
+                this.treeOutline.section.pane._lastDescriptions[this.propertyIdentifier] = descriptionToCompare;
 
             var prefix;
             var valueText;
