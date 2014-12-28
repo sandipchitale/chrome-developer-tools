@@ -90,9 +90,11 @@ WebInspector.Settings = function()
     this.enableAsyncStackTraces = this.createSetting("enableAsyncStackTraces", false);
     this.showMediaQueryInspector = this.createSetting("showMediaQueryInspector", false);
     this.disableOverridesWarning = this.createSetting("disableOverridesWarning", false);
+    this.disablePausedStateOverlay = this.createSetting("disablePausedStateOverlay", false);
     this.testPath = this.createSetting("testPath", "");
     this.frameViewerHideChromeWindow = this.createSetting("frameViewerHideChromeWindow", false);
     this.highlightDOMUpdates = this.createSetting("highlightDOMUpdates", true);
+    this.enableCustomFormatters = this.createSetting("customFormatters", false);
 
     // Rendering options
     this.showPaintRects = this.createSetting("showPaintRects", false);

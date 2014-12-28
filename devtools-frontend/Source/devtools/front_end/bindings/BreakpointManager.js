@@ -63,7 +63,7 @@ WebInspector.BreakpointManager.Events = {
 
 WebInspector.BreakpointManager._sourceFileId = function(uiSourceCode)
 {
-    if (!uiSourceCode.url)
+    if (!uiSourceCode.networkURL())
         return "";
     return uiSourceCode.uri();
 }
@@ -809,12 +809,12 @@ WebInspector.BreakpointManager.TargetBreakpoint.prototype = {
             if (script.sourceURL)
                 newState = new WebInspector.BreakpointManager.Breakpoint.State(script.sourceURL, null, debuggerLocation.lineNumber, debuggerLocation.columnNumber, condition);
             else
-                newState = new WebInspector.BreakpointManager.Breakpoint.State(null, debuggerLocation.scriptId, debuggerLocation.lineNumber, debuggerLocation.columnNumber, condition)
+                newState = new WebInspector.BreakpointManager.Breakpoint.State(null, debuggerLocation.scriptId, debuggerLocation.lineNumber, debuggerLocation.columnNumber, condition);
         } else if (this._breakpoint._currentState && this._breakpoint._currentState.url) {
             var position = this._breakpoint._currentState;
             newState = new WebInspector.BreakpointManager.Breakpoint.State(position.url, null, position.lineNumber, position.columnNumber, condition);
-        } else if (uiSourceCode && uiSourceCode.url)
-            newState = new WebInspector.BreakpointManager.Breakpoint.State(uiSourceCode.url, null, lineNumber, columnNumber, condition);
+        } else if (uiSourceCode && uiSourceCode.networkURL())
+            newState = new WebInspector.BreakpointManager.Breakpoint.State(uiSourceCode.networkURL(), null, lineNumber, columnNumber, condition);
 
         if (this._debuggerId && WebInspector.BreakpointManager.Breakpoint.State.equals(newState, this._currentState)) {
             callback();

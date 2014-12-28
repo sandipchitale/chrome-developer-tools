@@ -74,7 +74,7 @@ WebInspector.StylesSourceMapping.prototype = {
      */
     uiLocationToRawLocation: function(uiSourceCode, lineNumber, columnNumber)
     {
-        return new WebInspector.CSSLocation(this._cssModel.target(), null, uiSourceCode.url || "", lineNumber, columnNumber);
+        return new WebInspector.CSSLocation(this._cssModel.target(), null, uiSourceCode.networkURL() || "", lineNumber, columnNumber);
     },
 
     /**
@@ -175,7 +175,7 @@ WebInspector.StylesSourceMapping.prototype = {
     _uiSourceCodeAddedToWorkspace: function(event)
     {
         var uiSourceCode = /** @type {!WebInspector.UISourceCode} */ (event.data);
-        var url = uiSourceCode.url;
+        var url = uiSourceCode.networkURL();
         if (!url || !this._urlToHeadersByFrameId[url])
             return;
         this._bindUISourceCode(uiSourceCode, this._urlToHeadersByFrameId[url].valuesArray()[0].valuesArray()[0]);
@@ -189,7 +189,6 @@ WebInspector.StylesSourceMapping.prototype = {
     {
         if (this._styleFiles.get(uiSourceCode) || header.isInline)
             return;
-        var url = uiSourceCode.url;
         this._styleFiles.set(uiSourceCode, new WebInspector.StyleFile(uiSourceCode, this));
         WebInspector.cssWorkspaceBinding.updateLocations(header);
     },
@@ -244,9 +243,9 @@ WebInspector.StylesSourceMapping.prototype = {
      */
     _setStyleContent: function(uiSourceCode, content, majorChange, userCallback)
     {
-        var styleSheetIds = this._cssModel.styleSheetIdsForURL(uiSourceCode.url);
+        var styleSheetIds = this._cssModel.styleSheetIdsForURL(uiSourceCode.networkURL());
         if (!styleSheetIds.length) {
-            userCallback("No stylesheet found: " + uiSourceCode.url);
+            userCallback("No stylesheet found: " + uiSourceCode.networkURL());
             return;
         }
 
@@ -307,7 +306,7 @@ WebInspector.StylesSourceMapping.prototype = {
         var styleSheetURL = header.resourceURL();
         if (!styleSheetURL)
             return;
-        var uiSourceCode = this._workspace.uiSourceCodeForURL(styleSheetURL)
+        var uiSourceCode = this._workspace.uiSourceCodeForURL(styleSheetURL);
         if (!uiSourceCode)
             return;
         header.requestContent(callback.bind(this, uiSourceCode));

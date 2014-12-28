@@ -325,7 +325,7 @@ WebInspector.NetworkPanel.prototype = {
         }
 
         if (request) {
-            this._networkItemView = new WebInspector.NetworkItemView(request);
+            this._networkItemView = new WebInspector.NetworkItemView(request, this._networkLogView.timeCalculator());
             this._networkItemView.insertBeforeTabStrip(this._closeButtonElement);
             this._networkItemView.show(this._detailsView.element);
         }
@@ -420,9 +420,11 @@ WebInspector.NetworkPanel.prototype = {
          */
         function appendRevealItem(request)
         {
-            var revealText = WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Reveal in Network panel" : "Reveal in Network Panel");
-            contextMenu.appendItem(revealText, reveal.bind(this, request));
+            contextMenu.appendItem(WebInspector.UIString.capitalize("Reveal in Network ^panel"), reveal.bind(this, request));
         }
+
+        if (event.target.isSelfOrDescendant(this.element))
+            return;
 
         if (target instanceof WebInspector.Resource) {
             var resource = /** @type {!WebInspector.Resource} */ (target);
@@ -432,7 +434,7 @@ WebInspector.NetworkPanel.prototype = {
         }
         if (target instanceof WebInspector.UISourceCode) {
             var uiSourceCode = /** @type {!WebInspector.UISourceCode} */ (target);
-            var resource = WebInspector.resourceForURL(uiSourceCode.url);
+            var resource = WebInspector.resourceForURL(uiSourceCode.networkURL());
             if (resource && resource.request)
                 appendRevealItem.call(this, resource.request);
             return;

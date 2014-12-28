@@ -98,7 +98,6 @@ WebInspector.FileSystemWorkspaceBinding.prototype = {
     {
         var fileSystemPath = projectId.substr("filesystem:".length);
         var normalizedPath = WebInspector.IsolatedFileSystem.normalizePath(fileSystemPath);
-        var boundFileSystem = this._boundFileSystems.get(normalizedPath);
         return projectId.substr("filesystem:".length);
     },
 
@@ -138,7 +137,6 @@ WebInspector.FileSystemWorkspaceBinding.prototype = {
     _onIndexingTotalWorkCalculated: function(event)
     {
         var requestId = /** @type {number} */ (event.data["requestId"]);
-        var fileSystemPath = /** @type {string} */ (event.data["fileSystemPath"]);
         var totalWork = /** @type {number} */ (event.data["totalWork"]);
 
         var progress = this._progresses[requestId];
@@ -153,7 +151,6 @@ WebInspector.FileSystemWorkspaceBinding.prototype = {
     _onIndexingWorked: function(event)
     {
         var requestId = /** @type {number} */ (event.data["requestId"]);
-        var fileSystemPath = /** @type {string} */ (event.data["fileSystemPath"]);
         var worked = /** @type {number} */ (event.data["worked"]);
 
         var progress = this._progresses[requestId];
@@ -168,7 +165,6 @@ WebInspector.FileSystemWorkspaceBinding.prototype = {
     _onIndexingDone: function(event)
     {
         var requestId = /** @type {number} */ (event.data["requestId"]);
-        var fileSystemPath = /** @type {string} */ (event.data["fileSystemPath"]);
 
         var progress = this._progresses[requestId];
         if (!progress)
@@ -183,7 +179,6 @@ WebInspector.FileSystemWorkspaceBinding.prototype = {
     _onSearchCompleted: function(event)
     {
         var requestId = /** @type {number} */ (event.data["requestId"]);
-        var fileSystemPath = /** @type {string} */ (event.data["fileSystemPath"]);
         var files = /** @type {!Array.<string>} */ (event.data["files"]);
 
         var callback = this._callbacks[requestId];
@@ -196,6 +191,7 @@ WebInspector.FileSystemWorkspaceBinding.prototype = {
 
 /**
  * @constructor
+ * @extends {WebInspector.Object}
  * @implements {WebInspector.ProjectDelegate}
  * @param {!WebInspector.IsolatedFileSystem} isolatedFileSystem
  * @param {!WebInspector.Workspace} workspace
@@ -203,6 +199,7 @@ WebInspector.FileSystemWorkspaceBinding.prototype = {
  */
 WebInspector.FileSystemWorkspaceBinding.FileSystem = function(fileSystemWorkspaceBinding, isolatedFileSystem, workspace)
 {
+    WebInspector.Object.call(this);
     this._fileSystemWorkspaceBinding = fileSystemWorkspaceBinding;
     this._fileSystem = isolatedFileSystem;
     this._fileSystemURL = "file://" + this._fileSystem.normalizedPath() + "/";
@@ -210,7 +207,7 @@ WebInspector.FileSystemWorkspaceBinding.FileSystem = function(fileSystemWorkspac
 
     this._projectId = WebInspector.FileSystemWorkspaceBinding.projectId(this._fileSystem.path());
     console.assert(!this._workspace.project(this._projectId));
-    this._projectStore = this._workspace.addProject(this._projectId, this);
+    this._workspace.addProject(this._projectId, this);
     this.populate();
 }
 
@@ -343,7 +340,7 @@ WebInspector.FileSystemWorkspaceBinding.FileSystem.prototype = {
             filePath = filePath.substr(1);
             var newURL = this._workspace.urlForPath(this._fileSystem.path(), filePath);
             var extension = this._extensionForPath(validNewName);
-            var newOriginURL = this._fileSystemURL + filePath
+            var newOriginURL = this._fileSystemURL + filePath;
             var newContentType = this._contentTypeForExtension(extension);
             callback(true, validNewName, newURL, newOriginURL, newContentType);
         }
@@ -519,7 +516,7 @@ WebInspector.FileSystemWorkspaceBinding.FileSystem.prototype = {
      */
     excludeFolder: function(path)
     {
-        this._fileSystemWorkspaceBinding._isolatedFileSystemManager.mapping().addExcludedFolder(this._fileSystem.path(), path);
+        this._fileSystemWorkspaceBinding._isolatedFileSystemManager.excludedFolderManager().addExcludedFolder(this._fileSystem.path(), path);
     },
 
     /**
@@ -597,7 +594,7 @@ WebInspector.FileSystemWorkspaceBinding.FileSystem.prototype = {
         var contentType = this._contentTypeForExtension(extension);
 
         var fileDescriptor = new WebInspector.FileDescriptor(parentPath, name, this._fileSystemURL + filePath, url, contentType);
-        this._projectStore.addFile(fileDescriptor);
+        this.dispatchEventToListeners(WebInspector.ProjectDelegate.Events.FileAdded, fileDescriptor);
     },
 
     /**
@@ -605,13 +602,15 @@ WebInspector.FileSystemWorkspaceBinding.FileSystem.prototype = {
      */
     _removeFile: function(path)
     {
-        this._projectStore.removeFile(path);
+        this.dispatchEventToListeners(WebInspector.ProjectDelegate.Events.FileRemoved, path);
     },
 
     dispose: function()
     {
         this._workspace.removeProject(this._projectId);
-    }
+    },
+
+    __proto__: WebInspector.Object.prototype
 }
 
 /**

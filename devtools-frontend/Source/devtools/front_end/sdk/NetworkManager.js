@@ -133,7 +133,7 @@ WebInspector.NetworkManager.prototype = {
 
     dispose: function()
     {
-        WebInspector.settings.cacheDisabled.removeChangeListener(this._cacheDisabledSettingChanged, this)
+        WebInspector.settings.cacheDisabled.removeChangeListener(this._cacheDisabledSettingChanged, this);
     },
 
     __proto__: WebInspector.SDKModel.prototype
@@ -209,6 +209,8 @@ WebInspector.NetworkDispatcher.prototype = {
         if (response.fromDiskCache)
             networkRequest.setFromDiskCache();
         networkRequest.timing = response.timing;
+
+        networkRequest.protocol = response.protocol;
 
         if (!this._mimeTypeIsConsistentWithType(networkRequest)) {
             var consoleModel = this._manager._target.consoleModel;
@@ -440,6 +442,7 @@ WebInspector.NetworkDispatcher.prototype = {
         if (response.requestHeadersText)
             networkRequest.setRequestHeadersText(response.requestHeadersText);
         networkRequest.responseReceivedTime = time;
+        networkRequest.protocol = "websocket";
 
         this._updateNetworkRequest(networkRequest);
     },

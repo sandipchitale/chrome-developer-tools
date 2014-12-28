@@ -48,6 +48,7 @@ WebInspector.TracingModel.MetadataEvent = {
 WebInspector.TracingModel.DevToolsMetadataEventCategory = "disabled-by-default-devtools.timeline";
 
 WebInspector.TracingModel.ConsoleEventCategory = "blink.console";
+WebInspector.TracingModel.TopLevelEventCategory = "disabled-by-default-devtools.timeline.top-level-task";
 
 WebInspector.TracingModel.FrameLifecycleEventCategory = "cc,devtools";
 
@@ -506,7 +507,7 @@ WebInspector.TracingModel.Event = function(category, name, phase, startTime, thr
     /** @type {?Element} */
     this.previewElement = null;
     /** @type {?string} */
-    this.imageURL = null;
+    this.url = null;
     /** @type {number} */
     this.backendNodeId = 0;
 
@@ -838,7 +839,7 @@ WebInspector.TracingModel.Process.prototype = {
             var startEvent = steps[0];
             var syntheticEndEvent = new WebInspector.TracingModel.Event(startEvent.category, startEvent.name, WebInspector.TracingModel.Phase.AsyncEnd, lastEventTimeMs, startEvent.thread);
             steps.push(syntheticEndEvent);
-            startEvent.setEndTime(lastEventTimeMs)
+            startEvent.setEndTime(lastEventTimeMs);
         }
         for (var key in this._openNestableAsyncEvents) {
             var openEvents = this._openNestableAsyncEvents[key];

@@ -52,6 +52,7 @@
         "ZoomManager.js"
     ],
     "stylesheets": [
+        "checkboxTextLabel.css",
         "dataGrid.css",
         "filter.css",
         "flameChart.css",
@@ -60,6 +61,7 @@
         "panelEnablerView.css",
         "pieChart.css",
         "progressIndicator.css",
+        "radioButton.css",
         "searchableView.css",
         "softContextMenu.css",
         "splitView.css",

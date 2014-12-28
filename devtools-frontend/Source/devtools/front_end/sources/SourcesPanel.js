@@ -419,9 +419,9 @@ WebInspector.SourcesPanel.prototype = {
             return;
 
         if (this._paused) {
-            this._updateButtonTitle(this._pauseButton, WebInspector.UIString("Resume script execution (%s)."))
+            this._updateButtonTitle(this._pauseButton, WebInspector.UIString("Resume script execution (%s)."));
             this._pauseButton.setToggled(true);
-            this._pauseButton.setLongClickOptionsEnabled((function() { return [ this._longResumeButton ] }).bind(this));
+            this._pauseButton.setLongClickOptionsEnabled((function() { return [ this._longResumeButton ]; }).bind(this));
 
             this._pauseButton.setEnabled(true);
             this._stepOverButton.setEnabled(true);
@@ -650,7 +650,6 @@ WebInspector.SourcesPanel.prototype = {
         debugToolbar.element.classList.add("scripts-debug-toolbar");
 
         var title, handler;
-        var platformSpecificModifier = WebInspector.KeyboardShortcut.Modifiers.CtrlOrMeta;
 
         // Run snippet.
         title = WebInspector.UIString("Run snippet (%s).");
@@ -798,6 +797,7 @@ WebInspector.SourcesPanel.prototype = {
     {
         this._appendUISourceCodeItems(event, contextMenu, target);
         this._appendRemoteObjectItems(contextMenu, target);
+        this._appendNetworkRequestItems(contextMenu, target);
     },
 
     _suggestReload: function()
@@ -864,11 +864,11 @@ WebInspector.SourcesPanel.prototype = {
     _appendUISourceCodeMappingItems: function(contextMenu, uiSourceCode)
     {
         if (uiSourceCode.project().type() === WebInspector.projectTypes.FileSystem) {
-            var hasMappings = !!uiSourceCode.url;
+            var hasMappings = !!uiSourceCode.networkURL();
             if (!hasMappings)
-                contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Map to network resource\u2026" : "Map to Network Resource\u2026"), this.mapFileSystemToNetwork.bind(this, uiSourceCode));
+                contextMenu.appendItem(WebInspector.UIString.capitalize("Map to ^network ^resource\u2026"), this.mapFileSystemToNetwork.bind(this, uiSourceCode));
             else
-                contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Remove network mapping" : "Remove Network Mapping"), this._removeNetworkMapping.bind(this, uiSourceCode));
+                contextMenu.appendItem(WebInspector.UIString.capitalize("Remove ^network ^mapping"), this._removeNetworkMapping.bind(this, uiSourceCode));
         }
 
         /**
@@ -882,8 +882,8 @@ WebInspector.SourcesPanel.prototype = {
         if (uiSourceCode.project().type() === WebInspector.projectTypes.Network || uiSourceCode.project().type() === WebInspector.projectTypes.ContentScripts) {
             if (!this._workspace.projects().filter(filterProject).length)
                 return;
-            if (this._workspace.uiSourceCodeForURL(uiSourceCode.url) === uiSourceCode)
-                contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Map to file system resource\u2026" : "Map to File System Resource\u2026"), this.mapNetworkToFileSystem.bind(this, uiSourceCode));
+            if (this._workspace.uiSourceCodeForURL(uiSourceCode.networkURL()) === uiSourceCode)
+                contextMenu.appendItem(WebInspector.UIString.capitalize("Map to ^file ^system ^resource\u2026"), this.mapNetworkToFileSystem.bind(this, uiSourceCode));
         }
     },
 
@@ -900,18 +900,18 @@ WebInspector.SourcesPanel.prototype = {
         var uiSourceCode = /** @type {!WebInspector.UISourceCode} */ (target);
         var projectType = uiSourceCode.project().type();
         if (projectType !== WebInspector.projectTypes.FileSystem)
-            contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Local modifications\u2026" : "Local Modifications\u2026"), this._showLocalHistory.bind(this, uiSourceCode));
+            contextMenu.appendItem(WebInspector.UIString.capitalize("Local ^modifications\u2026"), this._showLocalHistory.bind(this, uiSourceCode));
         this._appendUISourceCodeMappingItems(contextMenu, uiSourceCode);
 
         var contentType = uiSourceCode.contentType();
         if ((contentType === WebInspector.resourceTypes.Script || contentType === WebInspector.resourceTypes.Document) && projectType !== WebInspector.projectTypes.Snippets) {
-            var url = projectType === WebInspector.projectTypes.Formatter ? uiSourceCode.originURL() : uiSourceCode.url;
+            var url = projectType === WebInspector.projectTypes.Formatter ? uiSourceCode.originURL() : uiSourceCode.networkURL();
             this.sidebarPanes.callstack.appendBlackboxURLContextMenuItems(contextMenu, url, projectType === WebInspector.projectTypes.ContentScripts);
         }
 
         if (projectType !== WebInspector.projectTypes.Debugger && !event.target.isSelfOrDescendant(this._navigator.view.element)) {
             contextMenu.appendSeparator();
-            contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Reveal in navigator" : "Reveal in Navigator"), this._handleContextMenuReveal.bind(this, uiSourceCode));
+            contextMenu.appendItem(WebInspector.UIString.capitalize("Reveal in ^navigator"), this._handleContextMenuReveal.bind(this, uiSourceCode));
         }
     },
 
@@ -933,11 +933,27 @@ WebInspector.SourcesPanel.prototype = {
         if (!(target instanceof WebInspector.RemoteObject))
             return;
         var remoteObject = /** @type {!WebInspector.RemoteObject} */ (target);
-        contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Store as global variable" : "Store as Global Variable"), this._saveToTempVariable.bind(this, remoteObject));
+        contextMenu.appendItem(WebInspector.UIString.capitalize("Store as ^global ^variable"), this._saveToTempVariable.bind(this, remoteObject));
         if (remoteObject.type === "function")
-            contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Show function definition" : "Show Function Definition"), this._showFunctionDefinition.bind(this, remoteObject));
+            contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^function ^definition"), this._showFunctionDefinition.bind(this, remoteObject));
         if (remoteObject.subtype === "generator")
-            contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Show generator location" : "Show Generator Location"), this._showGeneratorLocation.bind(this, remoteObject));
+            contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^generator ^location"), this._showGeneratorLocation.bind(this, remoteObject));
+    },
+
+    /**
+     * @param {!WebInspector.ContextMenu} contextMenu
+     * @param {!Object} target
+     */
+    _appendNetworkRequestItems: function(contextMenu, target)
+    {
+        if (!(target instanceof WebInspector.NetworkRequest))
+            return;
+        var request = /** @type {!WebInspector.NetworkRequest} */ (target);
+        var uiSourceCode = this._workspace.uiSourceCodeForURL(request.url);
+        if (!uiSourceCode)
+            return;
+        var openText = WebInspector.UIString.capitalize("Open in Sources ^panel");
+        contextMenu.appendItem(openText, this.showUILocation.bind(this, uiSourceCode.uiLocation(0, 0)));
     },
 
     /**
@@ -1192,14 +1208,14 @@ WebInspector.UpgradeFileSystemDropTarget = function(element)
 WebInspector.UpgradeFileSystemDropTarget.dragAndDropFilesType = "Files";
 
 WebInspector.UpgradeFileSystemDropTarget.prototype = {
-    _onDragEnter: function (event)
+    _onDragEnter: function(event)
     {
         if (event.dataTransfer.types.indexOf(WebInspector.UpgradeFileSystemDropTarget.dragAndDropFilesType) === -1)
             return;
         event.consume(true);
     },
 
-    _onDragOver: function (event)
+    _onDragOver: function(event)
     {
         if (event.dataTransfer.types.indexOf(WebInspector.UpgradeFileSystemDropTarget.dragAndDropFilesType) === -1)
             return;
@@ -1213,7 +1229,7 @@ WebInspector.UpgradeFileSystemDropTarget.prototype = {
         this._dragMaskElement.addEventListener("dragleave", this._onDragLeave.bind(this), true);
     },
 
-    _onDrop: function (event)
+    _onDrop: function(event)
     {
         event.consume(true);
         this._removeMask();
@@ -1226,13 +1242,13 @@ WebInspector.UpgradeFileSystemDropTarget.prototype = {
         InspectorFrontendHost.upgradeDraggedFileSystemPermissions(entry.filesystem);
     },
 
-    _onDragLeave: function (event)
+    _onDragLeave: function(event)
     {
         event.consume(true);
         this._removeMask();
     },
 
-    _removeMask: function ()
+    _removeMask: function()
     {
         this._dragMaskElement.remove();
         delete this._dragMaskElement;

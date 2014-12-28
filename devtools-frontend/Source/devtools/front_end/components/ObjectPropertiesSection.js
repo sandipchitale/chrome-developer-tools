@@ -26,7 +26,7 @@
 
 /**
  * @constructor
- * @extends {WebInspector.PropertiesSection}
+ * @extends {WebInspector.Section}
  * @param {!WebInspector.RemoteObject} object
  * @param {?string|!Element=} title
  * @param {string=} subtitle
@@ -45,7 +45,7 @@ WebInspector.ObjectPropertiesSection = function(object, title, subtitle, emptyPl
     this.editable = true;
     this.skipProto = false;
 
-    WebInspector.PropertiesSection.call(this, title || "", subtitle);
+    WebInspector.Section.call(this, title || "", subtitle);
 }
 
 /** @const */
@@ -130,7 +130,7 @@ WebInspector.ObjectPropertiesSection.prototype = {
         this.propertiesForTest = properties;
     },
 
-    __proto__: WebInspector.PropertiesSection.prototype
+    __proto__: WebInspector.Section.prototype
 }
 
 /**
@@ -194,8 +194,8 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
     onattach: function()
     {
         // record the propertyIdentifier
-        if (this.propertyIdentifier && this.treeOutline.section.pane && this.treeOutline.section.pane._propertyIdentifiers)
-            this.treeOutline.section.pane._propertyIdentifiers[this.propertyIdentifier] = 1;
+        if (this.propertyPath() && this.treeOutline.section.pane && this.treeOutline.section.pane._propertyIdentifiers)
+            this.treeOutline.section.pane._propertyIdentifiers[this.propertyPath()] = 1;
 
         this.update();
     },
@@ -224,10 +224,10 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
             var subtype = this.property.value.subtype;
             // detect if the propertyIdentifier was shown when the debugee was suspended last time
             var hadProperty = true;
-            if (this.propertyIdentifier && this.treeOutline.section && this.treeOutline.section.pane)
+            if (this.propertyPath() && this.treeOutline.section && this.treeOutline.section.pane)
                 // not a first suspension
                 if (this.treeOutline.section.pane._lastDescriptions)
-                    hadProperty = (this.treeOutline.section.pane._lastDescriptions[this.propertyIdentifier] != undefined);
+                    hadProperty = (this.treeOutline.section.pane._lastDescriptions[this.propertyPath()] != undefined);
                 else {
                     // first suspension
                     this.treeOutline.section.pane._lastDescriptions = {};
@@ -236,9 +236,9 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
 
             var oldDescription;
 
-            if (this.propertyIdentifier && this.treeOutline.section && this.treeOutline.section.pane && this.treeOutline.section.pane._lastDescriptions)
+            if (this.propertyPath() && this.treeOutline.section && this.treeOutline.section.pane && this.treeOutline.section.pane._lastDescriptions)
                 // retrieve the description from last suspension
-                oldDescription = this.treeOutline.section.pane._lastDescriptions[this.propertyIdentifier];
+                oldDescription = this.treeOutline.section.pane._lastDescriptions[this.propertyPath()];
 
             // description now
             var description = this.property.value.description;
@@ -254,8 +254,8 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
             else
                 descriptionChanged = true;
 
-            if (this.propertyIdentifier && this.treeOutline.section && this.treeOutline.section.pane && this.treeOutline.section.pane._lastDescriptions)
-                this.treeOutline.section.pane._lastDescriptions[this.propertyIdentifier] = descriptionToCompare;
+            if (this.propertyPath() && this.treeOutline.section && this.treeOutline.section.pane && this.treeOutline.section.pane._lastDescriptions)
+                this.treeOutline.section.pane._lastDescriptions[this.propertyPath()] = descriptionToCompare;
 
             var prefix;
             var valueText;
@@ -504,11 +504,20 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
     },
 
     /**
+     * @override
+     * @return {*}
+     */
+    elementIdentity: function()
+    {
+        return this.propertyPath();
+    },
+
+    /**
      * @return {string|undefined}
      */
     propertyPath: function()
     {
-        if ("_cachedPropertyPath" in this)
+        if (this._cachedPropertyPath)
             return this._cachedPropertyPath;
 
         var current = this;

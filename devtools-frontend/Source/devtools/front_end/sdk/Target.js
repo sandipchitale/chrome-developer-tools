@@ -29,7 +29,6 @@ WebInspector.Target = function(name, connection, callback)
     if (Runtime.experiments.isEnabled("timelinePowerProfiler"))
         this.powerAgent().canProfilePower(this._initializeCapability.bind(this, WebInspector.Target.Capabilities.CanProfilePower, null));
     this.workerAgent().canInspectWorkers(this._initializeCapability.bind(this, WebInspector.Target.Capabilities.CanInspectWorkers, this._loadedWithCapabilities.bind(this, callback)));
-    this.consoleAgent().setTracingBasedTimeline(true);
 }
 
 /**
@@ -48,10 +47,6 @@ WebInspector.Target._nextId = 1;
 WebInspector.Target.prototype = {
     suspend: function()
     {
-        if (!Runtime.experiments.isEnabled("disableAgentsWhenProfile")) {
-            this.debuggerModel.asyncStackTracesStateChanged();
-            return;
-        }
         this.debuggerModel.suspendModel();
         this.cssModel.suspendModel();
         this.domModel.suspendModel();
@@ -59,13 +54,9 @@ WebInspector.Target.prototype = {
 
     resume: function()
     {
-        if (Runtime.experiments.isEnabled("disableAgentsWhenProfile")) {
-            this.domModel.resumeModel();
-            this.cssModel.resumeModel();
-            this.debuggerModel.resumeModel();
-        } else {
-            this.debuggerModel.asyncStackTracesStateChanged();
-        }
+        this.domModel.resumeModel();
+        this.cssModel.resumeModel();
+        this.debuggerModel.resumeModel();
     },
 
     /**
@@ -186,7 +177,7 @@ WebInspector.Target.prototype = {
         /** @type {!WebInspector.AnimationModel} */
         this.animationModel = new WebInspector.AnimationModel(this);
 
-        if (WebInspector.isWorkerFrontend() && this.isWorkerTarget() && Runtime.experiments.isEnabled("serviceWorkerCacheInspection")) {
+        if (WebInspector.isWorkerFrontend() && this.isWorkerTarget()) {
             /** @type {!WebInspector.ServiceWorkerCacheModel} */
             this.serviceWorkerCacheModel = new WebInspector.ServiceWorkerCacheModel(this);
         }
@@ -453,7 +444,7 @@ WebInspector.TargetManager.prototype = {
      */
     createTarget: function(name, connection, callback)
     {
-        var target = new WebInspector.Target(name, connection, callbackWrapper.bind(this));
+        new WebInspector.Target(name, connection, callbackWrapper.bind(this));
 
         /**
          * @this {WebInspector.TargetManager}

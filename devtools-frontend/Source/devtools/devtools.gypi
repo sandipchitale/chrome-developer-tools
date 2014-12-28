@@ -109,6 +109,7 @@
             'front_end/components/ObjectPropertiesSection.js',
             'front_end/components/ShortcutsScreen.js',
             'front_end/components/TargetsComboBoxController.js',
+            'front_end/components/CustomPreviewSection.js',
         ],
         'devtools_host_js_files': [
             'front_end/host/InspectorFrontendHost.js',
@@ -160,6 +161,7 @@
             'front_end/sdk/WorkerTargetManager.js',
         ],
         'devtools_workspace_js_files': [
+            'front_end/workspace/ExcludedFolderManager.js',
             'front_end/workspace/FileManager.js',
             'front_end/workspace/FileSystemMapping.js',
             'front_end/workspace/FileSystemWorkspaceBinding.js',
@@ -212,6 +214,7 @@
             'front_end/toolbox/ResponsiveDesignView.js',
         ],
         'devtools_ui_js_files': [
+            'front_end/ui/checkboxTextLabel.css',
             'front_end/ui/dataGrid.css',
             'front_end/ui/filter.css',
             'front_end/ui/flameChart.css',
@@ -220,6 +223,7 @@
             'front_end/ui/panelEnablerView.css',
             'front_end/ui/pieChart.css',
             'front_end/ui/progressIndicator.css',
+            'front_end/ui/radioButton.css',
             'front_end/ui/searchableView.css',
             'front_end/ui/softContextMenu.css',
             'front_end/ui/splitView.css',
@@ -294,7 +298,6 @@
             'front_end/console/module.json',
             'front_end/devices/module.json',
             'front_end/devtools_app/module.json',
-            'front_end/documentation/module.json',
             'front_end/elements/module.json',
             'front_end/extensions/module.json',
             'front_end/heap_snapshot_worker/module.json',
@@ -350,13 +353,6 @@
         'devtools_devices_js_files': [
             'front_end/devices/devicesView.css',
             'front_end/devices/DevicesView.js',
-        ],
-        'devtools_documentation_js_files': [
-            'front_end/documentation/documentationView.css',
-            'front_end/documentation/DocumentationCatalog.js',
-            'front_end/documentation/DocumentationView.js',
-            'front_end/documentation/JSArticle.js',
-            'front_end/documentation/WikiParser.js',
         ],
         'devtools_elements_js_files': [
             'front_end/elements/breadcrumbs.css',
@@ -591,7 +587,6 @@
             '<@(devtools_audits_js_files)',
             '<@(devtools_console_js_files)',
             '<@(devtools_devices_js_files)',
-            '<@(devtools_documentation_js_files)',
             '<@(devtools_elements_js_files)',
             '<@(devtools_extensions_js_files)',
             '<@(devtools_heap_snapshot_worker_js_files)',
@@ -641,6 +636,7 @@
             'front_end/Images/navigationControls.png',
             'front_end/Images/navigationControls_2x.png',
             'front_end/Images/paneAddButtons.png',
+            'front_end/Images/paneAnimationsButtons.png',
             'front_end/Images/paneElementStateButtons.png',
             'front_end/Images/paneFilterButtons.png',
             'front_end/Images/paneRefreshButtons.png',
