@@ -44,7 +44,7 @@ WebInspector.SettingsScreen = function(onHide)
     this._contentElement = this.element.createChild("div", "help-window-main");
     var settingsLabelElement = createElementWithClass("div", "help-window-label");
     settingsLabelElement.createTextChild(WebInspector.UIString("Settings"));
-    this._contentElement.appendChild(this._createCloseButton());
+    this._contentElement.appendChild(this.createCloseButton());
 
     this._tabbedPane = new WebInspector.TabbedPane();
     this._tabbedPane.insertBeforeTabStrip(settingsLabelElement);
@@ -229,7 +229,7 @@ WebInspector.GenericSettingsTab.prototype = {
     _populateSectionsFromExtensions: function()
     {
         /** @const */
-        var explicitSectionOrder = ["", "Appearance", "Elements", "Sources", "Profiler", "Console", "Extensions"];
+        var explicitSectionOrder = ["", "Appearance", "Elements", "Sources", "Network", "Profiler", "Console", "Extensions"];
 
         var allExtensions = self.runtime.extensions("ui-setting");
 

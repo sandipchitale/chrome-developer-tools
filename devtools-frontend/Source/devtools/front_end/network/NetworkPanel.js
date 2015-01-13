@@ -328,12 +328,11 @@ WebInspector.NetworkPanel.prototype = {
             this._networkItemView = new WebInspector.NetworkItemView(request, this._networkLogView.timeCalculator());
             this._networkItemView.insertBeforeTabStrip(this._closeButtonElement);
             this._networkItemView.show(this._detailsView.element);
-        }
-
-        if (!!request)
             this._splitView.showBoth();
-        else
+        } else {
             this._splitView.hideMain();
+            this._networkLogView.clearSelection();
+        }
         this._updateUI();
     },
 
@@ -434,7 +433,7 @@ WebInspector.NetworkPanel.prototype = {
         }
         if (target instanceof WebInspector.UISourceCode) {
             var uiSourceCode = /** @type {!WebInspector.UISourceCode} */ (target);
-            var resource = WebInspector.resourceForURL(uiSourceCode.networkURL());
+            var resource = WebInspector.resourceForURL(WebInspector.networkMapping.networkURL(uiSourceCode));
             if (resource && resource.request)
                 appendRevealItem.call(this, resource.request);
             return;

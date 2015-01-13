@@ -284,7 +284,7 @@ WebInspector.DataGrid.prototype = {
 
         var element = this._editingNode._element.children[cellIndex];
         WebInspector.InplaceEditor.startEditing(element, this._startEditingConfig(element));
-        element.window().getSelection().setBaseAndExtent(element, 0, element, 1);
+        element.getComponentSelection().setBaseAndExtent(element, 0, element, 1);
     },
 
     _startEditing: function(target)
@@ -307,7 +307,7 @@ WebInspector.DataGrid.prototype = {
         this._editing = true;
         WebInspector.InplaceEditor.startEditing(element, this._startEditingConfig(element));
 
-        element.window().getSelection().setBaseAndExtent(element, 0, element, 1);
+        element.getComponentSelection().setBaseAndExtent(element, 0, element, 1);
     },
 
     renderInline: function()
@@ -1385,8 +1385,7 @@ WebInspector.DataGridNode.prototype = {
         if (child.parent === this)
             throw("insertChild: Node is already a child of this node.");
 
-        if (child.parent)
-            child.parent.removeChild(child);
+        child.remove();
 
         this.children.splice(index, 0, child);
         this.hasChildren = true;
@@ -1414,6 +1413,12 @@ WebInspector.DataGridNode.prototype = {
             child._attach();
         if (!this.revealed)
             child.revealed = false;
+    },
+
+    remove: function()
+    {
+        if (this.parent)
+            this.parent.removeChild(this);
     },
 
     /**

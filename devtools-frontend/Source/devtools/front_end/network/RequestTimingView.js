@@ -86,6 +86,14 @@ WebInspector.RequestTimeRangeNames = {
     Waiting: "waiting"
 };
 
+WebInspector.RequestTimingView.ConnectionSetupRangeNames = [
+    WebInspector.RequestTimeRangeNames.Blocking,
+    WebInspector.RequestTimeRangeNames.Connecting,
+    WebInspector.RequestTimeRangeNames.DNS,
+    WebInspector.RequestTimeRangeNames.Proxy,
+    WebInspector.RequestTimeRangeNames.SSL
+].keySet();
+
 /** @typedef {{name: !WebInspector.RequestTimeRangeNames, start: number, end: number}} */
 WebInspector.RequestTimeRange;
 
@@ -125,7 +133,7 @@ WebInspector.RequestTimingView.calculateRequestTimeRanges = function(request)
      */
     function addRange(name, start, end)
     {
-        if (start < end)
+        if (start <= end)
             result.push({name: name, start: start, end: end});
     }
 
@@ -155,7 +163,7 @@ WebInspector.RequestTimingView.calculateRequestTimeRanges = function(request)
 
     var timing = request.timing;
     if (!timing) {
-        var start = (request.startTime === -1) ? 0 : request.startTime;
+        var start = request.issueTime() !== -1 ? request.issueTime() : request.startTime !== -1 ? request.startTime : 0;
         var middle = (request.responseReceivedTime === -1) ? Number.MAX_VALUE : request.responseReceivedTime;
         var end = (request.endTime === -1) ? Number.MAX_VALUE : request.endTime;
         addRange(WebInspector.RequestTimeRangeNames.Total, start, end);
@@ -164,10 +172,11 @@ WebInspector.RequestTimingView.calculateRequestTimeRanges = function(request)
         return result;
     }
 
+    var issueTime = request.issueTime();
     var startTime = timing.requestTime;
     var endTime = firstPositive([request.endTime, request.responseReceivedTime]) || startTime;
 
-    addRange(WebInspector.RequestTimeRangeNames.Total, startTime, endTime);
+    addRange(WebInspector.RequestTimeRangeNames.Total, issueTime < startTime ? issueTime : startTime, endTime);
 
     if (request.fetchedViaServiceWorker) {
         addOffsetRange(WebInspector.RequestTimeRangeNames.Blocking, 0, timing.serviceWorkerFetchStart);
@@ -206,13 +215,33 @@ WebInspector.RequestTimingView.createTimingTable = function(request, navigationS
     var endTime = timeRanges[0].end;
     var scale = 100 / (endTime - startTime);
 
-    var globalTimeInfo = tableElement.createChild("tr").createChild("td");
-    globalTimeInfo.colSpan = 2;
-    globalTimeInfo.createTextChild("Started at " + Number.secondsToString(timeRanges[0].start - navigationStart));
+    var connectionHeader;
+    var dataHeader;
+    var totalDuration = 0;
 
     for (var i = 0; i < timeRanges.length; ++i) {
         var range = timeRanges[i];
         var rangeName = range.name;
+        if (rangeName === WebInspector.RequestTimeRangeNames.Total) {
+            totalDuration = range.end - range.start;
+            continue;
+        }
+        if (WebInspector.RequestTimingView.ConnectionSetupRangeNames[rangeName]) {
+            if (!connectionHeader) {
+                connectionHeader = tableElement.createChild("tr", "network-timing-table-header");
+                connectionHeader.createChild("td").createTextChild("Connection Setup");
+                connectionHeader.createChild("td").createTextChild("");
+                connectionHeader.createChild("td").createTextChild("TIME");
+            }
+        } else {
+            if (!dataHeader) {
+                dataHeader = tableElement.createChild("tr", "network-timing-table-header");
+                dataHeader.createChild("td").createTextChild("Request/Response");
+                dataHeader.createChild("td").createTextChild("");
+                dataHeader.createChild("td").createTextChild("TIME");
+            }
+        }
+
         var left = (scale * (range.start - startTime));
         var right = (scale * (endTime - range.end));
         var duration = range.end - range.start;
@@ -225,11 +254,7 @@ WebInspector.RequestTimingView.createTimingTable = function(request, navigationS
         bar.style.left = left + "%";
         bar.style.right = right + "%";
         bar.textContent = "\u200B"; // Important for 0-time items to have 0 width.
-        var label = row.createChild("span", "network-timing-bar-title");
-        if (right < left)
-            label.style.right = right + "%";
-        else
-            label.style.left = left + "%";
+        var label = tr.createChild("td").createChild("div", "network-timing-bar-title");
         label.textContent = Number.secondsToString(duration, true);
     }
 
@@ -239,9 +264,11 @@ WebInspector.RequestTimingView.createTimingTable = function(request, navigationS
         cell.createTextChild(WebInspector.UIString("CAUTION: request is not finished yet!"));
     }
 
-    var note = tableElement.createChild("tr").createChild("td", "footnote");
+    var footer = tableElement.createChild("tr", "network-timing-footer");
+    var note = footer.createChild("td");
     note.colSpan = 2;
-    note.appendChild(WebInspector.createDocumentationAnchor("network#resource-network-timing", WebInspector.UIString("Explanation of resource timing")));
+    note.appendChild(WebInspector.createDocumentationAnchor("network#resource-network-timing", WebInspector.UIString("Explanation")));
+    footer.createChild("td").createTextChild(Number.secondsToString(totalDuration, true));
 
     return tableElement;
 }

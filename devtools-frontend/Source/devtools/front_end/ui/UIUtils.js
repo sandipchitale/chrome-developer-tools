@@ -29,6 +29,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+WebInspector.highlightedSearchResultClassName = "highlighted-search-result";
+
 /**
  * @param {!Element} element
  * @param {?function(!MouseEvent): boolean} elementDragStart
@@ -377,7 +379,7 @@ WebInspector.handleElementValueModifications = function(event, element, finishHa
     if (!arrowKeyOrMouseWheelEvent && !pageKeyPressed)
         return false;
 
-    var selection = element.window().getSelection();
+    var selection = element.getComponentSelection();
     if (!selection.rangeCount)
         return false;
 
@@ -720,7 +722,7 @@ WebInspector.setCurrentFocusElement = function(x)
         // Make a caret selection inside the new element if there isn't a range selection and there isn't already a caret selection inside.
         // This is needed (at least) to remove caret from console when focus is moved to some element in the panel.
         // The code below should not be applied to text fields and text areas, hence _isTextEditingElement check.
-        var selection = x.window().getSelection();
+        var selection = x.getComponentSelection();
         if (!WebInspector._isTextEditingElement(WebInspector._currentFocusElement) && selection.isCollapsed && !WebInspector._currentFocusElement.isInsertionCaretInside()) {
             var selectionRange = WebInspector._currentFocusElement.ownerDocument.createRange();
             selectionRange.setStart(WebInspector._currentFocusElement, 0);
@@ -800,15 +802,16 @@ WebInspector.highlightSearchResult = function(element, offset, length, domChange
  */
 WebInspector.highlightSearchResults = function(element, resultRanges, changes)
 {
-    return WebInspector.highlightRangesWithStyleClass(element, resultRanges, "highlighted-search-result", changes);
+    return WebInspector.highlightRangesWithStyleClass(element, resultRanges, WebInspector.highlightedSearchResultClassName, changes);
 }
 
 /**
  * @param {!Element} element
+ * @param {string} styleClass
  */
-WebInspector.removeSearchResultsHighlight = function(element)
+WebInspector.removeSearchResultsHighlight = function(element, styleClass)
 {
-    var highlightBits = element.querySelectorAll(".highlighted-search-result");
+    var highlightBits = element.querySelectorAll("." + styleClass);
     for (var i = 0; i < highlightBits.length; ++i) {
         var span = highlightBits[i];
         span.parentElement.replaceChild(createTextNode(span.textContent), span);

@@ -83,7 +83,7 @@ WebInspector.NetworkLogView = function(filterBar, progressBarContainer)
     this._resetSuggestionBuilder();
     this._initializeView();
 
-    WebInspector.settings.networkShowRequestTimingInTimeline.addChangeListener(this._invalidateAllItems, this);
+    WebInspector.settings.networkColorCodeResourceTypes.addChangeListener(this._invalidateAllItems, this);
     WebInspector.settings.resourcesLargeRows.addChangeListener(this._updateRowsSize, this);
     WebInspector.settings.networkLogHideColumns.addChangeListener(this._updateColumns, this);
 
@@ -107,6 +107,9 @@ WebInspector.NetworkLogView._defaultColumnsVisibility = {
     "Cache-Control": false, "Connection": false, "Content-Encoding": false, "Content-Length": false, "ETag": false, "Keep-Alive": false, "Last-Modified": false, "Server": false, "Vary": false
 };
 WebInspector.NetworkLogView._defaultRefreshDelay = 500;
+
+WebInspector.NetworkLogView._waterfallMinOvertime = 1;
+WebInspector.NetworkLogView._waterfallMaxOvertime = 3;
 
 /** @enum {string} */
 WebInspector.NetworkLogView.FilterType = {
@@ -195,12 +198,10 @@ WebInspector.NetworkLogView.prototype = {
     {
     },
 
-    /**
-     * @return {boolean}
-     */
-    allowRequestSelection: function()
+    clearSelection: function()
     {
-        return !this._gridMode;
+        if (this._dataGrid.selectedNode)
+            this._dataGrid.selectedNode.deselect();
     },
 
     _addFilters: function()
@@ -811,6 +812,18 @@ WebInspector.NetworkLogView.prototype = {
 
         this._highlightNthMatchedRequestForSearch(this._updateMatchCountAndFindMatchIndex(this._currentMatchedRequestNode), false);
 
+        if (this._shouldSetWaterfallWindow && this._mainRequestLoadTime !== -1) {
+            var waterfallWindow = this.calculator().boundary();
+            var overtime = this._mainRequestLoadTime - waterfallWindow.minimum;
+            overtime = Number.constrain(overtime, WebInspector.NetworkLogView._waterfallMinOvertime, WebInspector.NetworkLogView._waterfallMaxOvertime)
+            var waterfallEnd = this._mainRequestLoadTime + overtime;
+            if (waterfallEnd <= waterfallWindow.maximum) {
+                waterfallWindow.maximum = waterfallEnd;
+                this._shouldSetWaterfallWindow = false;
+                this._timeCalculator.setWindow(waterfallWindow);
+            }
+        }
+
         if (!this.calculator().boundary().equals(oldBoundary)) {
             // The boundaries changed, so all item graphs are stale.
             this._updateDividersIfNeeded();
@@ -823,9 +836,20 @@ WebInspector.NetworkLogView.prototype = {
         this._updateSummaryBar();
     },
 
+    expandTimeline: function()
+    {
+        this._shouldSetWaterfallWindow = false;
+        this._timeCalculator.setWindow(null);
+        this._updateDividersIfNeeded();
+        this._invalidateAllItems();
+    },
+
     reset: function()
     {
         this.dispatchEventToListeners(WebInspector.NetworkLogView.EventTypes.RequestSelected, null);
+
+        /** @type {boolean} */
+        this._shouldSetWaterfallWindow = Runtime.experiments.isEnabled("showPrimaryLoadWaterfallInNetworkTimeline") && WebInspector.settings.networkShowPrimaryLoadWaterfall.get();
 
         this._clearSearchMatchedList();
         if (this._popoverHelper)
@@ -833,6 +857,8 @@ WebInspector.NetworkLogView.prototype = {
 
         if (this._calculator)
             this._calculator.reset();
+
+        this._timeCalculator.setWindow(null);
 
         var nodes = this._nodesByRequestId.valuesArray();
         for (var i = 0; i < nodes.length; ++i)

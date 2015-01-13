@@ -128,9 +128,8 @@ WebInspector.ScopeChainSidebarPane.prototype = {
             else
                 var scopeObject = runtimeModel.createRemoteObject(scope.object);
 
-            var section = new WebInspector.ObjectPropertiesSection(scopeObject, title, subtitle, emptyPlaceholder, true, extraProperties, WebInspector.ScopeVariableTreeElement);
+            var section = new WebInspector.ObjectPropertiesSection(scopeObject, title, subtitle, emptyPlaceholder, true, extraProperties, WebInspector.ScopeVariableTreeElement, this);
             section.editInSelectedCallFrameWhenPaused = true;
-            section.pane = this;
 
             if (scope.type === DebuggerAgent.ScopeType.Global)
                 section.collapse();

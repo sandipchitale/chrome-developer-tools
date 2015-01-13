@@ -549,7 +549,7 @@ WebInspector.SourcesNavigatorView.prototype = {
        for (var i = 0; i < nodes.length; ++i) {
            var uiSourceCode = nodes[i].uiSourceCode();
            var inspectedPageURL = WebInspector.targetManager.inspectedPageURL();
-           if (inspectedPageURL && uiSourceCode.networkURL() === inspectedPageURL)
+           if (inspectedPageURL && WebInspector.networkMapping.networkURL(uiSourceCode) === inspectedPageURL)
               this.revealUISourceCode(uiSourceCode, true);
        }
     },
@@ -562,7 +562,7 @@ WebInspector.SourcesNavigatorView.prototype = {
     {
         WebInspector.NavigatorView.prototype._addUISourceCode.call(this, uiSourceCode);
         var inspectedPageURL = WebInspector.targetManager.inspectedPageURL();
-        if (inspectedPageURL && uiSourceCode.networkURL() === inspectedPageURL)
+        if (inspectedPageURL && WebInspector.networkMapping.networkURL(uiSourceCode) === inspectedPageURL)
             this.revealUISourceCode(uiSourceCode, true);
      },
 
@@ -1307,7 +1307,7 @@ WebInspector.NavigatorUISourceCodeTreeNode.prototype = {
         var editingConfig = new WebInspector.InplaceEditor.Config(commitHandler.bind(this), cancelHandler.bind(this));
         this.updateTitle(true);
         WebInspector.InplaceEditor.startEditing(this._treeElement.titleElement, editingConfig);
-        treeOutlineElement.window().getSelection().setBaseAndExtent(this._treeElement.titleElement, 0, this._treeElement.titleElement, 1);
+        treeOutlineElement.getComponentSelection().setBaseAndExtent(this._treeElement.titleElement, 0, this._treeElement.titleElement, 1);
     },
 
     __proto__: WebInspector.NavigatorTreeNode.prototype

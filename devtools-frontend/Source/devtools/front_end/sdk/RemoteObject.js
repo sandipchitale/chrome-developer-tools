@@ -190,6 +190,20 @@ WebInspector.RemoteObject.type = function(remoteObject)
 }
 
 /**
+ * @param {!WebInspector.RemoteObject|!RuntimeAgent.RemoteObject|!RuntimeAgent.ObjectPreview} object
+ * @return {number}
+ */
+WebInspector.RemoteObject.arrayLength = function(object)
+{
+    if (object.subtype !== "array")
+        return 0;
+    var matches = object.description.match(/\[([0-9]+)\]/);
+    if (!matches)
+        return 0;
+    return parseInt(matches[1], 10);
+}
+
+/**
  * @param {!RuntimeAgent.RemoteObject|!WebInspector.RemoteObject|number|string|boolean|undefined|null} object
  * @return {!RuntimeAgent.CallArgument}
  */
@@ -624,13 +638,7 @@ WebInspector.RemoteObjectImpl.prototype = {
      */
     arrayLength: function()
     {
-        if (this.subtype !== "array")
-            return 0;
-
-        var matches = this._description.match(/\[([0-9]+)\]/);
-        if (!matches)
-            return 0;
-        return parseInt(matches[1], 10);
+        return WebInspector.RemoteObject.arrayLength(this);
     },
 
     /**
@@ -817,7 +825,7 @@ WebInspector.ScopeRemoteObject.prototype = {
          */
         function wrappedCallback(properties, internalProperties)
         {
-            if (this._scopeRef && properties instanceof Array)
+            if (this._scopeRef && Array.isArray(properties))
                 this._savedScopeProperties = properties.slice();
             callback(properties, internalProperties);
         }
@@ -1034,7 +1042,7 @@ WebInspector.LocalJSONObject.prototype = {
         if (this._value === null)
             return "null";
 
-        if (this._value instanceof Array)
+        if (Array.isArray(this._value))
             return "array";
 
         if (this._value instanceof Date)
@@ -1115,7 +1123,7 @@ WebInspector.LocalJSONObject.prototype = {
      */
     arrayLength: function()
     {
-        return this._value instanceof Array ? this._value.length : 0;
+        return Array.isArray(this._value) ? this._value.length : 0;
     },
 
     /**

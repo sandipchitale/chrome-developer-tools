@@ -36,12 +36,7 @@ WebInspector.WatchExpressionsSidebarPane = function()
 {
     WebInspector.SidebarPane.call(this, WebInspector.UIString("Watch Expressions"));
 
-    this.section = new WebInspector.WatchExpressionsSection();
-    this.section.pane = this;
-
-    this._expandedExpressions = new Set();
-    this._expandedProperties = new Set();
-
+    this.section = new WebInspector.WatchExpressionsSection(this);
     this.bodyElement.appendChild(this.section.element);
 
     var refreshButton = this.titleElement.createChild("button", "pane-title-button refresh");
@@ -105,8 +100,9 @@ WebInspector.WatchExpressionsSidebarPane.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.Section}
+ * @param {!WebInspector.SidebarPane} sidebarPane
  */
-WebInspector.WatchExpressionsSection = function()
+WebInspector.WatchExpressionsSection = function(sidebarPane)
 {
     this._watchObjectGroupId = "watch-group";
 
@@ -129,6 +125,7 @@ WebInspector.WatchExpressionsSection = function()
     this.element.addEventListener("mouseleave", this._mouseLeave.bind(this), true);
     this.element.addEventListener("dblclick", this._sectionDoubleClick.bind(this), false);
     this.emptyElement.addEventListener("contextmenu", this._emptyElementContextMenu.bind(this), false);
+    this.pane = sidebarPane;
 }
 
 WebInspector.WatchExpressionsSection.NewWatchExpression = "\xA0";
@@ -216,8 +213,6 @@ WebInspector.WatchExpressionsSection.prototype = {
             this.element.appendChild(this.emptyElement);
             this.propertiesElement.remove();
             this.propertiesTreeOutline.removeChildren();
-            this.pane._expandedExpressions.clear();
-            this.pane._expandedProperties.clear();
         } else {
             this.element.appendChild(this.propertiesElement);
             this.emptyElement.remove();
