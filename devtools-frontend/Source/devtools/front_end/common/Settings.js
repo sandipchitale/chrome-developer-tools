@@ -84,6 +84,7 @@ WebInspector.Settings = function()
     this.visiblePanels = this.createSetting("visiblePanels", {});
     this.shortcutPanelSwitch = this.createSetting("shortcutPanelSwitch", false);
     this.showWhitespacesInEditor = this.createSetting("showWhitespacesInEditor", false);
+    this.highlightChangedProperties = this.createSetting("highlightChangedProperties", false);
     this.skipStackFramesPattern = this.createRegExpSetting("skipStackFramesPattern", "");
     this.skipContentScripts = this.createSetting("skipContentScripts", false);
     this.pauseOnExceptionEnabled = this.createSetting("pauseOnExceptionEnabled", false);

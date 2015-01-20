@@ -26,7 +26,7 @@
 
 /**
  * @constructor
- * @extends {WebInspector.Section}
+ * @extends {WebInspector.PropertiesSection}
  * @param {!WebInspector.RemoteObject} object
  * @param {?string|!Element=} title
  * @param {string=} subtitle
@@ -47,7 +47,7 @@ WebInspector.ObjectPropertiesSection = function(object, title, subtitle, emptyPl
     this.skipProto = false;
     this.pane = sidebarPane;
 
-    WebInspector.Section.call(this, title || "", subtitle);
+    WebInspector.PropertiesSection.call(this, title || "", subtitle);
 }
 
 /** @const */
@@ -132,7 +132,7 @@ WebInspector.ObjectPropertiesSection.prototype = {
         this.propertiesForTest = properties;
     },
 
-    __proto__: WebInspector.Section.prototype
+    __proto__: WebInspector.PropertiesSection.prototype
 }
 
 /**
@@ -196,7 +196,7 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
     onattach: function()
     {
         // record the propertyIdentifier
-        if (this.treeOutline.section.pane && this.propertyPath() && this.treeOutline.section.pane._propertyIdentifiers)
+        if (WebInspector.settings.highlightChangedProperties.get() && this.treeOutline.section.pane && this.propertyPath() && this.treeOutline.section.pane._propertyIdentifiers)
             this.treeOutline.section.pane._propertyIdentifiers[this.propertyPath()] = 1;
 
         this.update();
@@ -225,7 +225,7 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
             var type = this.property.value.type;
             var subtype = this.property.value.subtype;
 
-            if (this.treeOutline.section && this.treeOutline.section.pane) {
+            if (WebInspector.settings.highlightChangedProperties.get() && this.treeOutline.section && this.treeOutline.section.pane) {
                 // detect if the propertyIdentifier was shown when the debugee was suspended last time
                 var hadProperty = true;
                 if (this.propertyPath())
@@ -247,7 +247,7 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
 
             var description = this.property.value.description;
 
-            if (this.treeOutline.section && this.treeOutline.section.pane) {
+            if (WebInspector.settings.highlightChangedProperties.get() && this.treeOutline.section && this.treeOutline.section.pane) {
                 var descriptionToCompare = (type + ":" +
                     (subtype? subtype : "") + ":" + /* (this.property.value.objectId ? this.property.value.objectId : "") + ":" + */ description);
                 // determine if it has it changed only if description is initialized
@@ -299,7 +299,7 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
                 this.listItemElement.classList.add("hbox");
             }
 
-            if (this.treeOutline.section && this.treeOutline.section.pane) {
+            if (WebInspector.settings.highlightChangedProperties.get() && this.treeOutline.section && this.treeOutline.section.pane) {
                 if (descriptionChanged) {
                     this.valueElement.classList.add("highlighted-search-result");
                     if (!hadProperty)

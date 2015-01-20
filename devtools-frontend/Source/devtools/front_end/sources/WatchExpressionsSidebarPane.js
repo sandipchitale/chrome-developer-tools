@@ -99,14 +99,14 @@ WebInspector.WatchExpressionsSidebarPane.prototype = {
 
 /**
  * @constructor
- * @extends {WebInspector.Section}
+ * @extends {WebInspector.PropertiesSection}
  * @param {!WebInspector.SidebarPane} sidebarPane
  */
 WebInspector.WatchExpressionsSection = function(sidebarPane)
 {
     this._watchObjectGroupId = "watch-group";
 
-    WebInspector.Section.call(this, "");
+    WebInspector.PropertiesSection.call(this, "");
     this.treeElementConstructor = WebInspector.ObjectPropertyTreeElement;
     this.skipProto = false;
 
@@ -351,7 +351,7 @@ WebInspector.WatchExpressionsSection.prototype = {
         contextMenu.show();
     },
 
-    __proto__: WebInspector.Section.prototype
+    __proto__: WebInspector.PropertiesSection.prototype
 }
 
 /**
