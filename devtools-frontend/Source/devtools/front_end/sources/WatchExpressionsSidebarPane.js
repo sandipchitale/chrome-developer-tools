@@ -36,7 +36,10 @@ WebInspector.WatchExpressionsSidebarPane = function()
 {
     WebInspector.SidebarPane.call(this, WebInspector.UIString("Watch Expressions"));
 
-    this.section = new WebInspector.WatchExpressionsSection(this);
+    /** @type {!WebInspector.ObjectPropertiesMemento} */
+    this.memento = new WebInspector.ObjectPropertiesMemento();
+
+    this.section = new WebInspector.WatchExpressionsSection(this.memento);
     this.bodyElement.appendChild(this.section.element);
 
     var refreshButton = this.titleElement.createChild("button", "pane-title-button refresh");
@@ -100,13 +103,16 @@ WebInspector.WatchExpressionsSidebarPane.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.PropertiesSection}
- * @param {!WebInspector.SidebarPane} sidebarPane
+ * @param {!WebInspector.ObjectPropertiesMemento} memento
  */
-WebInspector.WatchExpressionsSection = function(sidebarPane)
+WebInspector.WatchExpressionsSection = function(memento)
 {
     this._watchObjectGroupId = "watch-group";
 
     WebInspector.PropertiesSection.call(this, "");
+
+    this.memento = memento;
+
     this.treeElementConstructor = WebInspector.ObjectPropertyTreeElement;
     this.skipProto = false;
 
@@ -125,7 +131,6 @@ WebInspector.WatchExpressionsSection = function(sidebarPane)
     this.element.addEventListener("mouseleave", this._mouseLeave.bind(this), true);
     this.element.addEventListener("dblclick", this._sectionDoubleClick.bind(this), false);
     this.emptyElement.addEventListener("contextmenu", this._emptyElementContextMenu.bind(this), false);
-    this.pane = sidebarPane;
 }
 
 WebInspector.WatchExpressionsSection.NewWatchExpression = "\xA0";

@@ -423,6 +423,7 @@ WebInspector.NetworkLogView.prototype = {
         this._dataGrid.setResizeMethod(WebInspector.DataGrid.ResizeMethod.Last);
         this._dataGrid.element.classList.add("network-log-grid");
         this._dataGrid.element.addEventListener("contextmenu", this._contextMenu.bind(this), true);
+        this._dataGrid.element.addEventListener("mousedown", this._dataGridMouseDown.bind(this), true);
         this._dataGrid.show(this.element);
 
         // Event listeners need to be added _after_ we attach to the document, so that owner document is properly update.
@@ -431,6 +432,15 @@ WebInspector.NetworkLogView.prototype = {
 
         this._patchTimelineHeader();
         this._dataGrid.sortNodes(this._sortingFunctions.startTime, false);
+    },
+
+    /**
+     * @param {!Event} event
+     */
+    _dataGridMouseDown: function(event)
+    {
+        if (!this._dataGrid.selectedNode && event.button)
+            event.consume();
     },
 
     /**
@@ -1008,6 +1018,12 @@ WebInspector.NetworkLogView.prototype = {
         this._updateColumns();
     },
 
+    revealSelectedItem: function()
+    {
+        if (this._dataGrid.selectedNode)
+            this._dataGrid.selectedNode.reveal();
+    },
+
     /**
      * @return {number}
      */
@@ -1022,6 +1038,7 @@ WebInspector.NetworkLogView.prototype = {
         this._rowHeight = largeRows ? 41 : 21;
         this._dataGrid.element.classList.toggle("small", !largeRows);
         this._timelineGrid.element.classList.toggle("small", !largeRows);
+        this._dataGrid.scheduleUpdate();
     },
 
     /**
@@ -1148,9 +1165,6 @@ WebInspector.NetworkLogView.prototype = {
 
         if (request) {
             contextMenu.appendApplicableItems(request);
-            contextMenu.appendItem(WebInspector.openLinkExternallyLabel(), openResourceInNewTab.bind(null, request.url));
-            contextMenu.appendSeparator();
-            contextMenu.appendItem(WebInspector.copyLinkAddressLabel(), this._copyLocation.bind(this, request));
             if (request.requestHeadersText())
                 contextMenu.appendItem(WebInspector.UIString.capitalize("Copy ^request ^headers"), this._copyRequestHeaders.bind(this, request));
             if (request.responseHeadersText)

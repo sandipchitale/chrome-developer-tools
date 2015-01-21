@@ -171,7 +171,7 @@
         {
             "type": "ui-setting",
             "section": "Sources",
-            "title": "Highlight Changed Properties",
+            "title": "Highlight changed properties",
             "settingName": "highlightChangedProperties",
             "settingType": "checkbox"
         },
