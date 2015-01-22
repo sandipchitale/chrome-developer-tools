@@ -246,7 +246,7 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
     onattach: function()
     {
         // record the propertyIdentifier
-        if (Runtime.experiments.isEnabled("highlightChangedProperties") && this.propertyPath() && this.treeOutline.section.memento)
+        if (this.propertyPath() && this.treeOutline.section.memento)
             this.treeOutline.section.memento.recordPropertyPath(this.propertyPath());
 
         this.update();
@@ -277,7 +277,7 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
 
             var oldDescription;
 
-            if (Runtime.experiments.isEnabled("highlightChangedProperties") && this.treeOutline.section.memento) {
+            if (this.treeOutline.section.memento) {
                 var hadProperty = false;
                 if (this.propertyPath()) {
                     var lastDesription = this.treeOutline.section.memento.lastDescriptionForPropertyPath(this.propertyPath())
@@ -288,7 +288,7 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
 
             var description = this.property.value.description;
 
-            if (Runtime.experiments.isEnabled("highlightChangedProperties") && this.treeOutline.section.memento) {
+            if (this.treeOutline.section.memento) {
                 var descriptionToCompare = (type + ":" +
                     (subtype? subtype : "") + ":" + /* (this.property.value.objectId ? this.property.value.objectId : "") + ":" + */ description);
                 var descriptionChanged = (!hadProperty) || (descriptionToCompare != oldDescription);
@@ -333,7 +333,7 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
                 this.listItemElement.classList.add("hbox");
             }
 
-            if (Runtime.experiments.isEnabled("highlightChangedProperties") && this.treeOutline.section.memento) {
+            if (this.treeOutline.section.memento) {
                 if (descriptionChanged) {
                     this.valueElement.classList.add("highlighted-search-result");
                     if (!hadProperty)
