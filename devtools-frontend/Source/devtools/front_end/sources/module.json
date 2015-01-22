@@ -171,13 +171,6 @@
         {
             "type": "ui-setting",
             "section": "Sources",
-            "title": "Highlight changed properties",
-            "settingName": "highlightChangedProperties",
-            "settingType": "checkbox"
-        },
-        {
-            "type": "ui-setting",
-            "section": "Sources",
             "title": "Enable CSS source maps",
             "settingName": "cssSourceMapsEnabled",
             "settingType": "checkbox"

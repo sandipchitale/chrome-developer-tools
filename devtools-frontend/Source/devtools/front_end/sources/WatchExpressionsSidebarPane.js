@@ -229,6 +229,9 @@ WebInspector.WatchExpressionsSection.prototype = {
      */
     updateProperties: function(properties)
     {
+        this.memento.forgetProperties();
+        this.memento.initPropertyIdentifiers();
+
         this.propertiesTreeOutline.removeChildren();
         WebInspector.ObjectPropertyTreeElement.populateWithProperties(this.propertiesTreeOutline, properties, [],
             WebInspector.WatchExpressionTreeElement, WebInspector.WatchExpressionsSection.CompareProperties, false, null);

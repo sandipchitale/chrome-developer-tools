@@ -139,6 +139,7 @@ WebInspector.Main.prototype = {
         Runtime.experiments.register("devicesPanel", "Devices panel");
         Runtime.experiments.register("fileSystemInspection", "FileSystem inspection");
         Runtime.experiments.register("gpuTimeline", "GPU data on timeline", true);
+        Runtime.experiments.register("highlightChangedProperties", "Highlight changed properties", false);
         Runtime.experiments.register("layersPanel", "Layers panel");
         Runtime.experiments.register("networkRequestHeadersFilterInDetailsView", "Network request headers filter in details view", true);
         Runtime.experiments.register("privateScriptInspection", "Private script inspection");

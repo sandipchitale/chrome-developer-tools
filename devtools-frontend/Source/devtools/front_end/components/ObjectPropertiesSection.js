@@ -45,6 +45,9 @@ WebInspector.ObjectPropertiesSection = function(object, title, subtitle, emptyPl
     this.treeElementConstructor = treeElementConstructor || WebInspector.ObjectPropertyTreeElement;
     this.editable = true;
     this.skipProto = false;
+    /**
+     * @private
+     */
     this.memento = memento;
 
     WebInspector.PropertiesSection.call(this, title || "", subtitle);
@@ -97,13 +100,7 @@ WebInspector.ObjectPropertiesSection.prototype = {
     updateProperties: function(properties, internalProperties, rootTreeElementConstructor, rootPropertyComparer)
     {
         if (this.memento) {
-            // Delete the cached last descriptions of all propertyIdentifiers
-            // did were not preset when the debugee was suspended last time
             this.memento.forgetProperties();
-
-            // start with empty propertyIdentifiers cache
-            // this will get populated as the tree elemnts are
-            // shown
             this.memento.initPropertyIdentifiers();
         }
 
@@ -154,17 +151,19 @@ WebInspector.ObjectPropertiesSection.CompareProperties = function(propertyA, pro
 /**
  * @constructor
  */
-WebInspector.ObjectPropertiesMemento = function() {
+WebInspector.ObjectPropertiesMemento = function()
+{
     this._expandedProperties = new Set();
     this._lastDescriptions = {};
     this._propertyIdentifiers = {};
 }
 
 WebInspector.ObjectPropertiesMemento.prototype = {
-    forgetProperties: function() {
-        for (var pi in this._lastDescriptions) {
+    forgetProperties: function()
+    {
+        for (var pi in this._lastDescriptions)
+        {
             if (!(pi in this._propertyIdentifiers))
-                // Delete the properties that no longer exist
                 delete this._lastDescriptions[pi];
         }
     },
@@ -172,28 +171,36 @@ WebInspector.ObjectPropertiesMemento.prototype = {
     /**
      * @return {boolean}
      */
-    isPropertyPathExpanded: function(propertyPath) {
+    isPropertyPathExpanded: function(propertyPath)
+    {
         return this._expandedProperties.has(propertyPath);
     },
-    addExpandedPropertyPath: function(propertyPath) {
+    addExpandedPropertyPath: function(propertyPath)
+    {
         this._expandedProperties.add(propertyPath);
     },
-    deleteExpandedPropertyPath: function(propertyPath) {
+    deleteExpandedPropertyPath: function(propertyPath)
+    {
         this._expandedProperties['delete'](propertyPath);
     },
-    initPropertyIdentifiers: function() {
+    initPropertyIdentifiers: function()
+    {
         this._propertyIdentifiers = {};
     },
-    recordPropertyPath: function(propertyPath) {
+    recordPropertyPath: function(propertyPath)
+    {
         this._propertyIdentifiers[propertyPath] = 1;
     },
+
     /**
      * @return {string}
      */
-    getLastDescriptionForPropertyPath: function(propertyPath) {
+    lastDescriptionForPropertyPath: function(propertyPath)
+    {
         return this._lastDescriptions[propertyPath];
     },
-    setLastDescriptionForPropertyPath: function(propertyPath, description) {
+    setLastDescriptionForPropertyPath: function(propertyPath, description)
+    {
         this._lastDescriptions[propertyPath] = description;
     }
 }
@@ -223,7 +230,7 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
 
     /**
      * @override
-     * @Return {boolean}
+     * @return {boolean}
      */
     ondblclick: function(event)
     {
@@ -239,7 +246,7 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
     onattach: function()
     {
         // record the propertyIdentifier
-        if (WebInspector.settings.highlightChangedProperties.get() && this.propertyPath() && this.treeOutline.section.memento && this.treeOutline.section.memento._propertyIdentifiers)
+        if (Runtime.experiments.isEnabled("highlightChangedProperties") && this.propertyPath() && this.treeOutline.section.memento)
             this.treeOutline.section.memento.recordPropertyPath(this.propertyPath());
 
         this.update();
@@ -270,32 +277,23 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
 
             var oldDescription;
 
-            if (WebInspector.settings.highlightChangedProperties.get() && this.treeOutline.section && this.treeOutline.section.memento) {
-                // detect if the propertyIdentifier was shown when the debugee was suspended last time
+            if (Runtime.experiments.isEnabled("highlightChangedProperties") && this.treeOutline.section.memento) {
                 var hadProperty = false;
-                var lastDesription = this.treeOutline.section.memento.getLastDescriptionForPropertyPath(this.propertyPath())
                 if (this.propertyPath()) {
+                    var lastDesription = this.treeOutline.section.memento.lastDescriptionForPropertyPath(this.propertyPath())
                     hadProperty = (lastDesription != undefined);
-                    // retrieve the description from last suspension
                     oldDescription = lastDesription;
                 }
             }
 
             var description = this.property.value.description;
 
-            if (WebInspector.settings.highlightChangedProperties.get() && this.treeOutline.section && this.treeOutline.section.memento) {
+            if (Runtime.experiments.isEnabled("highlightChangedProperties") && this.treeOutline.section.memento) {
                 var descriptionToCompare = (type + ":" +
                     (subtype? subtype : "") + ":" + /* (this.property.value.objectId ? this.property.value.objectId : "") + ":" + */ description);
-                // determine if it has it changed only if description is initialized
-                // this handles the case when the variable came into scope but
-                // was not initialized
-                var descriptionChanged = false;
-                if (hadProperty)
-                    descriptionChanged = (descriptionToCompare != oldDescription);
-                else
-                    descriptionChanged = true;
+                var descriptionChanged = (!hadProperty) || (descriptionToCompare != oldDescription);
 
-                if (this.propertyPath() && this.treeOutline.section.memento._lastDescriptions)
+                if (this.propertyPath())
                     this.treeOutline.section.memento.setLastDescriptionForPropertyPath(this.propertyPath(), descriptionToCompare);
             }
 
@@ -335,7 +333,7 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
                 this.listItemElement.classList.add("hbox");
             }
 
-            if (WebInspector.settings.highlightChangedProperties.get() && this.treeOutline.section && this.treeOutline.section.memento) {
+            if (Runtime.experiments.isEnabled("highlightChangedProperties") && this.treeOutline.section.memento) {
                 if (descriptionChanged) {
                     this.valueElement.classList.add("highlighted-search-result");
                     if (!hadProperty)
