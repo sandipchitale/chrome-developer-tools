@@ -106,6 +106,10 @@
     cursor: pointer;
 }
 
+.network-log-grid.data-grid .timeline-column {
+    padding: 1px 0;
+}
+
 #network-container:not(.brief-mode) .network-log-grid.data-grid td.name-column:hover {
     text-decoration: underline;
 }
@@ -280,6 +284,10 @@
 .network-timeline-grid .resources-dividers-label-bar {
     right: 12px;
     left: 12px;
+}
+
+.network-timeline-grid .resources-event-dividers {
+    margin-left: 1px;
 }
 
 .network-graph-label {
@@ -502,20 +510,16 @@
     pointer-events: none;
 }
 
-.network-event-divider-padding {
-    position: absolute;
-    width: 8px;
-    top: 0;
-    bottom: 0;
-    pointer-events: auto;
-}
-
 .network-event-divider {
     position: absolute;
     width: 2px;
     top: 31px;
     bottom: 0;
     z-index: 300;
+}
+
+.network-event-divider.invisible {
+    visibility: hidden;
 }
 
 .network-timeline-grid.small .network-event-divider {
@@ -526,8 +530,16 @@
     background-color: rgba(255, 0, 0, 0.5);
 }
 
+.network-summary-bar .summary-red {
+    color: red;
+}
+
 .network-blue-divider {
     background-color: rgba(0, 0, 255, 0.5);
+}
+
+.network-summary-bar .summary-blue {
+    color: blue;
 }
 
 .network-log-grid.data-grid .resources-dividers {

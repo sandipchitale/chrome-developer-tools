@@ -1136,6 +1136,14 @@ WebInspector.ElementsTreeOutline.prototype = {
         effectiveNode.resolveToObject("", resolvedNode);
     },
 
+    _reset: function()
+    {
+        this.rootDOMNode = null;
+        this.selectDOMNode(null, false);
+        this._popoverHelper.hidePopover();
+        delete this._clipboardNodeData;
+    },
+
     __proto__: TreeOutline.prototype
 }
 
@@ -1504,13 +1512,11 @@ WebInspector.ElementsTreeUpdater.prototype = {
 
     _reset: function()
     {
-        this._treeOutline.rootDOMNode = null;
-        this._treeOutline.selectDOMNode(null, false);
+        this._treeOutline._reset();
         this._domModel.hideDOMNodeHighlight();
         this._recentlyModifiedNodes.clear();
         this._recentlyModifiedParentNodes.clear();
         this._updateInfos.clear();
-        delete this._treeOutline._clipboardNodeData;
     },
 
     /**
@@ -1901,8 +1907,10 @@ WebInspector.ElementsTreeUpdater.prototype = {
      * @param {!WebInspector.ElementsTreeElement} child
      * @param {number} targetIndex
      */
-    moveChild: function(treeElement, child, targetIndex)
+    _moveChild: function(treeElement, child, targetIndex)
     {
+        if (treeElement.children.indexOf(child) === targetIndex)
+            return;
         var wasSelected = child.selected;
         treeElement.removeChild(child);
         treeElement.insertChild(child, targetIndex);
@@ -1963,7 +1971,7 @@ WebInspector.ElementsTreeUpdater.prototype = {
             var child = visibleChildren[i];
             if (existingTreeElements.has(child)) {
                 // If an existing element was found, just move it.
-                this.moveChild(treeElement, existingTreeElements.get(child), i);
+                this._moveChild(treeElement, existingTreeElements.get(child), i);
             } else {
                 // No existing element found, insert a new element.
                 var newElement = this.insertChildElement(treeElement, child, i);

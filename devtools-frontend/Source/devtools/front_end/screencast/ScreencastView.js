@@ -279,7 +279,7 @@ WebInspector.ScreencastView.prototype = {
         }
 
         var text = event.type === "keypress" ? String.fromCharCode(event.charCode) : undefined;
-        InputAgent.dispatchKeyEvent(type, this._modifiersForEvent(event), event.timeStamp / 1000, text, text ? text.toLowerCase() : undefined,
+        this._target.inputAgent().dispatchKeyEvent(type, this._modifiersForEvent(event), event.timeStamp / 1000, text, text ? text.toLowerCase() : undefined,
                                     event.keyIdentifier, event.keyCode /* windowsVirtualKeyCode */, event.keyCode /* nativeVirtualKeyCode */, false, false, false);
         event.consume();
         this._canvasElement.focus();
@@ -321,7 +321,7 @@ WebInspector.ScreencastView.prototype = {
         }
         if (event.type === "mouseup")
             delete this._eventScreenOffsetTop;
-        InputAgent.invoke_emulateTouchFromMouseEvent(params);
+        WebInspector.targetManager.mainTarget().inputAgent().invoke_emulateTouchFromMouseEvent(params);
     },
 
     /**
@@ -333,7 +333,7 @@ WebInspector.ScreencastView.prototype = {
             var params = this._eventParams;
             delete this._eventParams;
             params.type = "mouseReleased";
-            InputAgent.invoke_emulateTouchFromMouseEvent(params);
+            WebInspector.targetManager.mainTarget().inputAgent().invoke_emulateTouchFromMouseEvent(params);
         }
     },
 
@@ -679,6 +679,14 @@ WebInspector.ScreencastView.prototype = {
     },
 
     /**
+     * @override
+     * @param {!PageAgent.FrameId} frameId
+     */
+    highlightFrame: function(frameId)
+    {
+    },
+
+    /**
      * @param {!CanvasRenderingContext2D} context
      */
     _createCheckerboardPattern: function(context)
@@ -730,7 +738,7 @@ WebInspector.ScreencastView.prototype = {
         var newIndex = this._historyIndex + offset;
         if (newIndex < 0 || newIndex >= this._historyEntries.length)
           return;
-        PageAgent.navigateToHistoryEntry(this._historyEntries[newIndex].id);
+        this._target.pageAgent().navigateToHistoryEntry(this._historyEntries[newIndex].id);
         this._requestNavigationHistory();
     },
 
@@ -748,13 +756,13 @@ WebInspector.ScreencastView.prototype = {
             return;
         if (!url.match(WebInspector.ScreencastView._SchemeRegex))
             url = "http://" + url;
-        PageAgent.navigate(url);
+        this._target.pageAgent().navigate(url);
         this._canvasElement.focus();
     },
 
     _requestNavigationHistory: function()
     {
-        PageAgent.getNavigationHistory(this._onNavigationHistory.bind(this));
+        this._target.pageAgent().getNavigationHistory(this._onNavigationHistory.bind(this));
     },
 
     _onNavigationHistory: function(error, currentIndex, entries)

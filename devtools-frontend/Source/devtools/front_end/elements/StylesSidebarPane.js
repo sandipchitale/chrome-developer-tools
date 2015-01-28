@@ -1124,7 +1124,8 @@ WebInspector.StylesSidebarPane.prototype = {
             this._animationsPlaybackSlider.value = WebInspector.AnimationsSidebarPane.GlobalPlaybackRates.indexOf(playbackRate);
             this._animationsPlaybackLabel.textContent = playbackRate + "x";
         }
-        PageAgent.animationsPlaybackRate(setPlaybackRate.bind(this));
+        if (this._target)
+            this._target.pageAgent().animationsPlaybackRate(setPlaybackRate.bind(this));
     },
 
     _createAnimationsControlPane: function()
@@ -1136,7 +1137,7 @@ WebInspector.StylesSidebarPane.prototype = {
         function playbackSliderInputHandler(event)
         {
             this._animationsPlaybackRate = WebInspector.AnimationsSidebarPane.GlobalPlaybackRates[event.target.value];
-            PageAgent.setAnimationsPlaybackRate(this._animationsPaused ? 0 : this._animationsPlaybackRate);
+            this._target.pageAgent().setAnimationsPlaybackRate(this._animationsPaused ? 0 : this._animationsPlaybackRate);
             this._animationsPlaybackLabel.textContent = this._animationsPlaybackRate + "x";
             WebInspector.userMetrics.AnimationsPlaybackRateChanged.record();
         }
@@ -1147,7 +1148,7 @@ WebInspector.StylesSidebarPane.prototype = {
         function pauseButtonHandler()
         {
             this._animationsPaused = !this._animationsPaused;
-            PageAgent.setAnimationsPlaybackRate(this._animationsPaused ? 0 : this._animationsPlaybackRate);
+            this._target.pageAgent().setAnimationsPlaybackRate(this._animationsPaused ? 0 : this._animationsPlaybackRate);
             WebInspector.userMetrics.AnimationsPlaybackRateChanged.record();
             this._animationsPauseButton.element.classList.toggle("pause-status-bar-item");
             this._animationsPauseButton.element.classList.toggle("play-status-bar-item");
@@ -1628,7 +1629,6 @@ WebInspector.StylePropertiesSection.prototype = {
             if (media.sourceURL) {
                 var refElement = mediaDataElement.createChild("div", "subtitle");
                 var anchor = this._parentPane._linkifier.linkifyMedia(media);
-                anchor.style.float = "right";
                 refElement.appendChild(anchor);
             }
 
@@ -2745,34 +2745,6 @@ WebInspector.StylePropertyTreeElementBase.prototype = {
         this.valueElement = valueElement;
 
         /**
-         * @param {!RegExp} regex
-         * @param {function(string):!Node} processor
-         * @param {?function(string):!Node} nextProcessor
-         * @param {string} valueText
-         * @return {!DocumentFragment}
-         */
-        function processValue(regex, processor, nextProcessor, valueText)
-        {
-            var container = createDocumentFragment();
-
-            var items = valueText.replace(regex, "\0$1\0").split("\0");
-            for (var i = 0; i < items.length; ++i) {
-                if ((i % 2) === 0) {
-                    if (nextProcessor)
-                        container.appendChild(nextProcessor(items[i]));
-                    else
-                        container.createTextChild(items[i]);
-                } else {
-                    var processedNode = processor(items[i]);
-                    if (processedNode)
-                        container.appendChild(processedNode);
-                }
-            }
-
-            return container;
-        }
-
-        /**
          * @param {string} value
          * @return {!RegExp}
          */
@@ -2811,8 +2783,12 @@ WebInspector.StylePropertyTreeElementBase.prototype = {
         }
 
         if (value) {
-            var colorProcessor = processValue.bind(null, WebInspector.StylesSidebarPane._colorRegex, this._processColor.bind(this, nameElement, valueElement), null);
-            valueElement.appendChild(processValue(urlRegex(value), linkifyURL.bind(this), WebInspector.CSSMetadata.isColorAwareProperty(this.name) && this.parsedOk ? colorProcessor : null, value));
+            var formatter = new WebInspector.StringFormatter();
+            formatter.addProcessor(urlRegex(value), linkifyURL.bind(this));
+            if (WebInspector.CSSMetadata.isColorAwareProperty(this.name) && this.parsedOk)
+                formatter.addProcessor(WebInspector.StylesSidebarPane._colorRegex, this._processColor.bind(this, nameElement, valueElement));
+
+            valueElement.appendChild(formatter.formatText(value));
         }
 
         this.listItemElement.removeChildren();

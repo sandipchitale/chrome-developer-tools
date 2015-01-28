@@ -106,7 +106,7 @@ WebInspector.NetworkLogView._defaultColumnsVisibility = {
     method: true, status: true, protocol: false, scheme: false, domain: false, remoteAddress: false, type: true, initiator: true, cookies: false, setCookies: false, size: true, time: true, connectionId: false,
     "Cache-Control": false, "Connection": false, "Content-Encoding": false, "Content-Length": false, "ETag": false, "Keep-Alive": false, "Last-Modified": false, "Server": false, "Vary": false
 };
-WebInspector.NetworkLogView._defaultRefreshDelay = 500;
+WebInspector.NetworkLogView._defaultRefreshDelay = 200;
 
 WebInspector.NetworkLogView._waterfallMinOvertime = 1;
 WebInspector.NetworkLogView._waterfallMaxOvertime = 3;
@@ -282,6 +282,10 @@ WebInspector.NetworkLogView.prototype = {
         this._timelineGrid = new WebInspector.TimelineGrid();
         this._timelineGrid.element.classList.add("network-timeline-grid");
         this._dataGrid.element.appendChild(this._timelineGrid.element);
+        this._loadDivider = createElementWithClass("div", "network-event-divider network-red-divider invisible");
+        this._timelineGrid.addEventDivider(this._loadDivider);
+        this._domContentLoadedDivider = createElementWithClass("div", "network-event-divider network-blue-divider invisible");
+        this._timelineGrid.addEventDivider(this._domContentLoadedDivider);
     },
 
     _createTable: function()
@@ -618,22 +622,47 @@ WebInspector.NetworkLogView.prototype = {
             if (request.endTime > maxTime)
                 maxTime = request.endTime;
         }
+
+        var summaryBar = this._summaryBarElement;
+        summaryBar.removeChildren();
+        var separator = "\u2002\u2758\u2002";
         var text = "";
+        /**
+         * @param {string} chunk
+         * @return {!Element}
+         */
+        function appendChunk(chunk)
+        {
+            var span = summaryBar.createChild("span");
+            span.textContent = chunk;
+            text += chunk;
+            return span;
+        }
+
         if (selectedRequestsNumber !== requestsNumber) {
-            text += String.sprintf(WebInspector.UIString("%d / %d requests"), selectedRequestsNumber, requestsNumber);
-            text += "  \u2758  " + String.sprintf(WebInspector.UIString("%s / %s transferred"), Number.bytesToString(selectedTransferSize), Number.bytesToString(transferSize));
+            appendChunk(WebInspector.UIString("%d / %d requests", selectedRequestsNumber, requestsNumber));
+            appendChunk(separator);
+            appendChunk(WebInspector.UIString("%s / %s transferred", Number.bytesToString(selectedTransferSize), Number.bytesToString(transferSize)));
         } else {
-            text += String.sprintf(WebInspector.UIString("%d requests"), requestsNumber);
-            text += "  \u2758  " + String.sprintf(WebInspector.UIString("%s transferred"), Number.bytesToString(transferSize));
+            appendChunk(WebInspector.UIString("%d requests", requestsNumber));
+            appendChunk(separator);
+            appendChunk(WebInspector.UIString("%s transferred", Number.bytesToString(transferSize)));
         }
-        if (baseTime !== -1 && this._mainRequestLoadTime !== -1 && this._mainRequestDOMContentLoadedTime !== -1 && this._mainRequestDOMContentLoadedTime > baseTime) {
-            text += "  \u2758  " + String.sprintf(WebInspector.UIString("%s (load: %s, DOMContentLoaded: %s)"),
-                        Number.secondsToString(maxTime - baseTime),
-                        Number.secondsToString(this._mainRequestLoadTime - baseTime),
-                        Number.secondsToString(this._mainRequestDOMContentLoadedTime - baseTime));
+        if (baseTime !== -1) {
+            appendChunk(separator);
+            appendChunk(WebInspector.UIString("Finish: %s", Number.secondsToString(maxTime - baseTime)));
+            if (this._mainRequestDOMContentLoadedTime !== -1 && this._mainRequestDOMContentLoadedTime > baseTime) {
+                appendChunk(separator);
+                var domContentLoadedText = WebInspector.UIString("DOMContentLoaded: %s", Number.secondsToString(this._mainRequestDOMContentLoadedTime - baseTime));
+                appendChunk(domContentLoadedText).classList.add("summary-blue");
+            }
+            if (this._mainRequestLoadTime !== -1) {
+                appendChunk(separator);
+                var loadText = WebInspector.UIString("Load: %s", Number.secondsToString(this._mainRequestLoadTime - baseTime));
+                appendChunk(loadText).classList.add("summary-red");
+            }
         }
-        this._summaryBarElement.textContent = text;
-        this._summaryBarElement.title = text;
+        summaryBar.title = text;
     },
 
     _scheduleRefresh: function()
@@ -649,22 +678,19 @@ WebInspector.NetworkLogView.prototype = {
 
     _updateDividersIfNeeded: function()
     {
+        if (!this.isShowing()) {
+            this._scheduleRefresh();
+            return;
+        }
+
         var timelineOffset = this._dataGrid.columnOffset("timeline");
         // Position timline grid location.
         if (timelineOffset)
             this._timelineGrid.element.style.left = timelineOffset + "px";
 
         var calculator = this.calculator();
-        var proceed = true;
-        if (!this.isShowing()) {
-            this._scheduleRefresh();
-            proceed = false;
-        } else {
-            calculator.setDisplayWindow(this._timelineGrid.dividersElement.clientWidth);
-            proceed = this._timelineGrid.updateDividers(calculator);
-        }
-        if (!proceed)
-            return;
+        calculator.setDisplayWindow(this._timelineGrid.dividersElement.clientWidth);
+        this._timelineGrid.updateDividers(calculator);
 
         if (calculator.startAtZero) {
             // If our current sorting method starts at zero, that means it shows all
@@ -673,24 +699,13 @@ WebInspector.NetworkLogView.prototype = {
             return;
         }
 
-        this._timelineGrid.removeEventDividers();
         var loadTimePercent = calculator.computePercentageFromEventTime(this._mainRequestLoadTime);
-        if (this._mainRequestLoadTime !== -1 && loadTimePercent >= 0) {
-            var loadDivider = createElementWithClass("div", "network-event-divider-padding");
-            loadDivider.createChild("div", "network-event-divider network-red-divider");
-            loadDivider.title = WebInspector.UIString("Load event");
-            loadDivider.style.left = loadTimePercent + "%";
-            this._timelineGrid.addEventDivider(loadDivider);
-        }
+        this._loadDivider.classList.toggle("invisible", this._mainRequestLoadTime === -1 || loadTimePercent < 0);
+        this._loadDivider.style.left = loadTimePercent + "%";
 
         var domLoadTimePrecent = calculator.computePercentageFromEventTime(this._mainRequestDOMContentLoadedTime);
-        if (this._mainRequestDOMContentLoadedTime !== -1 && domLoadTimePrecent >= 0) {
-            var domContentLoadedDivider = createElementWithClass("div", "network-event-divider-padding");
-            domContentLoadedDivider.createChild("div", "network-event-divider network-blue-divider");
-            domContentLoadedDivider.title = WebInspector.UIString("DOMContentLoaded event");
-            domContentLoadedDivider.style.left = domLoadTimePrecent + "%";
-            this._timelineGrid.addEventDivider(domContentLoadedDivider);
-        }
+        this._domContentLoadedDivider.classList.toggle("invisible", this._mainRequestDOMContentLoadedTime === -1 || domLoadTimePrecent < 0);
+        this._domContentLoadedDivider.style.left = domLoadTimePrecent + "%";
     },
 
     _refreshIfNeeded: function()
@@ -1279,14 +1294,20 @@ WebInspector.NetworkLogView.prototype = {
 
     _clearBrowserCache: function()
     {
-        if (confirm(WebInspector.UIString("Are you sure you want to clear browser cache?")))
-            NetworkAgent.clearBrowserCache();
+        if (confirm(WebInspector.UIString("Are you sure you want to clear browser cache?"))) {
+            var target = WebInspector.targetManager.mainTarget()
+            if (target)
+                target.networkManager.clearBrowserCache();
+        }
     },
 
     _clearBrowserCookies: function()
     {
-        if (confirm(WebInspector.UIString("Are you sure you want to clear browser cookies?")))
-            NetworkAgent.clearBrowserCookies();
+        if (confirm(WebInspector.UIString("Are you sure you want to clear browser cookies?"))) {
+            var target = WebInspector.targetManager.mainTarget()
+            if (target)
+                target.networkManager.clearBrowserCookies();
+        }
     },
 
     /**

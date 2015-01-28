@@ -12,16 +12,56 @@ WebInspector.AnimationTimeline = function() {
     this.element.classList.add("animations-timeline");
     this._animations = [];
     this._uiAnimations = [];
+    this._duration = this._defaultDuration();
 }
 
 WebInspector.AnimationTimeline.prototype = {
     /**
      * @return {number}
      */
+    _defaultDuration: function ()
+    {
+        return 300;
+    },
+
+    /**
+     * @return {number}
+     */
     duration: function()
     {
-        // FIXME: this should scale according to the animations shown
-        return 300;
+        return this._duration;
+    },
+
+    /**
+     * @return {number|undefined}
+     */
+    startTime: function()
+    {
+        return this._startTime;
+    },
+
+    /**
+     * @param {!WebInspector.AnimationModel.AnimationPlayer} animation
+     * @return {boolean}
+     */
+    _inThreshold: function(animation)
+    {
+        if (!this._animations.length)
+            return true;
+
+        if (animation.startTime() - this._animations.peekLast().startTime() < 2000)
+            return true;
+
+        return false;
+    },
+
+    _reset: function()
+    {
+        this._animations = [];
+        this._uiAnimations = [];
+        this.contentElement.removeChildren();
+        this._duration = this._defaultDuration();
+        delete this._startTime;
     },
 
     /**
@@ -38,12 +78,19 @@ WebInspector.AnimationTimeline.prototype = {
             description.appendChild(WebInspector.DOMPresentationUtils.linkifyNodeReference(node));
         }
 
+        if (!this._inThreshold(animation))
+            this._reset();
+
         var row = this.contentElement.createChild("div", "animation-row");
         var description = row.createChild("div", "animation-node-description");
         animation.source().getNode(nodeResolved.bind(null, description));
         var container = row.createChild("div", "animation-timeline-row");
-        this._uiAnimations.push(new WebInspector.AnimationUI(animation, this, container));
+
+        this._resizeWindow(animation);
         this._animations.push(animation);
+
+        this._uiAnimations.push(new WebInspector.AnimationUI(animation, this, container));
+        this.redraw();
     },
 
     redraw: function()
@@ -57,98 +104,21 @@ WebInspector.AnimationTimeline.prototype = {
         this.redraw();
     },
 
+    /**
+     * @param {!WebInspector.AnimationModel.AnimationPlayer} animation
+     */
+    _resizeWindow: function(animation)
+    {
+        if (!this._startTime)
+            this._startTime = animation.startTime();
+
+        // This shows at most 2 iterations
+        var iterations = animation.source().iterations() || 1;
+        var duration = animation.source().duration() * Math.min(2, iterations);
+        this._duration = Math.max(this._duration, animation.startTime() + duration - this._startTime + 50);
+    },
+
     __proto__: WebInspector.VBox.prototype
-}
-
-/**
- * @constructor
- * @param {!WebInspector.Geometry.Point} point1
- * @param {!WebInspector.Geometry.Point} point2
- */
-WebInspector.AnimationTimeline.CubicBezier = function(point1, point2)
-{
-    this.controlPoints = [point1, point2];
-}
-
-/**
- * @param {string} text
- * @return {?WebInspector.AnimationTimeline.CubicBezier}
- */
-WebInspector.AnimationTimeline.CubicBezier.parse = function(text)
-{
-    var keywordValues = WebInspector.AnimationTimeline.CubicBezier.KeywordValues;
-    var value = text.toLowerCase().replace(/\s+/g, "");
-    if (Object.keys(keywordValues).indexOf(value) != -1)
-        return keywordValues[value];
-    var bezierRegex = /^cubic-bezier\(([^,]+),([^,]+),([^,]+),([^,]+)\)$/;
-    var match = value.match(bezierRegex);
-    if (match) {
-        var control1 = new WebInspector.Geometry.Point(parseFloat(match[1]), parseFloat(match[2]));
-        var control2 = new WebInspector.Geometry.Point(parseFloat(match[3]), parseFloat(match[4]));
-        return new WebInspector.AnimationTimeline.CubicBezier(control1, control2);
-    }
-    return null;
-}
-
-WebInspector.AnimationTimeline.CubicBezier.prototype = {
-    /**
-     * @param {number} t
-     * @return {!WebInspector.Geometry.Point}
-     */
-    _evaluateAt: function(t)
-    {
-        /**
-         * @param {number} v1
-         * @param {number} v2
-         * @param {number} t
-         */
-        function evaluate(v1, v2, t)
-        {
-            return 3 * (1 - t) * (1 - t) * t * v1 + 3 * (1 - t) * t * t * v2 + Math.pow(t, 3);
-        }
-
-        var x = evaluate(this.controlPoints[0].x, this.controlPoints[1].x, t);
-        var y = evaluate(this.controlPoints[0].y, this.controlPoints[1].y, t);
-        return new WebInspector.Geometry.Point(x, y);
-    },
-
-    /**
-     * @param {!Element} path
-     * @param {number} width
-     */
-    drawVelocityChart: function(path, width)
-    {
-        var height = WebInspector.AnimationUI.Options.GridCanvasHeight;
-        var pathBuilder = ["M", 0, height];
-
-        var prev = this._evaluateAt(0);
-        for (var t = this._sampleSize(); t < 1 + this._sampleSize(); t += this._sampleSize()) {
-            var current = this._evaluateAt(t);
-            var slope = (current.y - prev.y) / (current.x - prev.x);
-            var weightedX = prev.x * (1 - t) + current.x * t;
-            slope = Math.tanh(slope / 1.5); // Normalise slope
-            pathBuilder = pathBuilder.concat(["L", weightedX * width, height - slope * height ]);
-            prev = current;
-        }
-        pathBuilder = pathBuilder.concat(["L", width, height, "Z"]);
-        path.setAttribute("d", pathBuilder.join(" "));
-    },
-
-    /**
-     * @return {number}
-     */
-    _sampleSize: function()
-    {
-        return 1 / 40;
-    }
-}
-
-WebInspector.AnimationTimeline.CubicBezier.KeywordValues = {
-    "linear": new WebInspector.AnimationTimeline.CubicBezier(new WebInspector.Geometry.Point(0, 0), new WebInspector.Geometry.Point(1, 1)),
-    "ease": new WebInspector.AnimationTimeline.CubicBezier(new WebInspector.Geometry.Point(0.25, 0.1), new WebInspector.Geometry.Point(0.25, 1)),
-    "ease-in": new WebInspector.AnimationTimeline.CubicBezier(new WebInspector.Geometry.Point(0.42, 0), new WebInspector.Geometry.Point(1, 1)),
-    "ease-in-out": new WebInspector.AnimationTimeline.CubicBezier(new WebInspector.Geometry.Point(0.42, 0), new WebInspector.Geometry.Point(0.58, 1)),
-    "ease-out": new WebInspector.AnimationTimeline.CubicBezier(new WebInspector.Geometry.Point(0, 0), new WebInspector.Geometry.Point(0.58, 1))
 }
 
 /**
@@ -163,11 +133,9 @@ WebInspector.AnimationUI = function(animation, timeline, parentElement) {
     this._parentElement = parentElement;
 
     this._grid = parentElement.createChild("canvas", "animation-timeline-grid-row");
-    this._canvases = [];
     this._keyframes = this._animation.source().keyframesRule().keyframes();
 
     this._svg = parentElement.createSVGChild("svg");
-    this._svg.setAttribute("width", this._duration() * this._pixelMsRatio() + 2 * WebInspector.AnimationUI.Options.AnimationMargin);
     this._svg.setAttribute("height", WebInspector.AnimationUI.Options.AnimationCanvasHeight);
     this._svg.style.marginLeft = "-" + WebInspector.AnimationUI.Options.AnimationMargin + "px";
     this._svg.addEventListener("mousedown", this._mouseDown.bind(this, WebInspector.AnimationUI.MouseEvents.AnimationDrag, null));
@@ -244,17 +212,14 @@ WebInspector.AnimationUI.prototype = {
      */
     _drawPoint: function(x, keyframeIndex)
     {
-        var circle = this._svgGroup.createSVGChild("circle", "animation-point");
+        var circle = this._svgGroup.createSVGChild("circle", keyframeIndex <= 0 ? "animation-endpoint" : "animation-keyframe-point");
         circle.setAttribute("cx", x);
         circle.setAttribute("cy", WebInspector.AnimationUI.Options.GridCanvasHeight);
         circle.style.stroke = WebInspector.AnimationUI.Options.ColorPurple.asString(WebInspector.Color.Format.RGB);
-        if (keyframeIndex <= 0) {
-            circle.setAttribute("r", WebInspector.AnimationUI.Options.AnimationMargin / 2);
+        circle.setAttribute("r", WebInspector.AnimationUI.Options.AnimationMargin / 2);
+
+        if (keyframeIndex <= 0)
             circle.style.fill = WebInspector.AnimationUI.Options.ColorPurple.asString(WebInspector.Color.Format.RGB);
-        } else {
-            circle.setAttribute("r", WebInspector.AnimationUI.Options.AnimationMargin / 2 + 1);
-            circle.style.fill = "white";
-        }
 
         if (keyframeIndex == 0) {
             circle.addEventListener("mousedown", this._mouseDown.bind(this, WebInspector.AnimationUI.MouseEvents.StartEndpointMove, keyframeIndex));
@@ -268,20 +233,21 @@ WebInspector.AnimationUI.prototype = {
     redraw: function()
     {
         this._renderGrid();
-        this._svg.style.transform = "translateX(" + this._delay() * this._pixelMsRatio() + "px)";
+        this._svg.setAttribute("width", this._duration() * this._pixelMsRatio() + 2 * WebInspector.AnimationUI.Options.AnimationMargin);
+        this._svg.style.transform = "translateX(" + (this._animation.startTime() - this._timeline.startTime() + this._delay()) * this._pixelMsRatio() + "px)";
         this._svgGroup.removeChildren();
         this._drawAnimationLine();
 
         for (var i = 0; i < this._keyframes.length - 1; i++) {
             var leftDistance = this._offset(i) * this._duration() * this._pixelMsRatio()  + WebInspector.AnimationUI.Options.AnimationMargin;
             var width = this._duration() * (this._offset(i + 1) - this._offset(i)) * this._pixelMsRatio();
-            var bezier = WebInspector.AnimationTimeline.CubicBezier.parse(this._keyframes[i].easing());
+            var bezier = WebInspector.Geometry.CubicBezier.parse(this._keyframes[i].easing());
             // FIXME: add support for step functions
             if (bezier) {
                 var path = this._svgGroup.createSVGChild("path", "animation-keyframe");
                 path.style.transform = "translateX(" + leftDistance + "px)";
                 path.style.fill = WebInspector.AnimationUI.Options.ColorPurple.asString(WebInspector.Color.Format.RGB);
-                bezier.drawVelocityChart(path, width);
+                WebInspector.BezierUI.drawVelocityChart(bezier, path, width);
             }
             this._drawPoint(leftDistance, i);
         }

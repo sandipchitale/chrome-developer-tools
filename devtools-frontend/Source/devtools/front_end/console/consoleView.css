@@ -95,7 +95,6 @@
 
 .console-timestamp {
     color: gray;
-    margin-right: 10px;
     -webkit-user-select: none;
 }
 
@@ -374,6 +373,13 @@
 
 .console-message-text {
     white-space: pre-wrap;
+}
+
+.console-message-url {
+    float: right;
+    text-align: right;
+    max-width: 100%;
+    margin-left: 4px;
 }
 
 .console-message-nowrap-below,
