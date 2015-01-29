@@ -963,6 +963,8 @@ WebInspector.SourcesPanel.prototype = {
         contextMenu.appendItem(WebInspector.UIString.capitalize("Store as ^global ^variable"), this._saveToTempVariable.bind(this, remoteObject));
         if (remoteObject.type === "function")
             contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^function ^definition"), this._showFunctionDefinition.bind(this, remoteObject));
+        if (remoteObject.type === "object" && "array" !== remoteObject.subtype && remoteObject.description !== "Object")
+            contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^type ^definition"), this._showTypeDefinition.bind(this, remoteObject));
         if (remoteObject.subtype === "generator")
             contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^generator ^location"), this._showGeneratorLocation.bind(this, remoteObject));
     },
@@ -1046,6 +1048,32 @@ WebInspector.SourcesPanel.prototype = {
             }
             WebInspector.console.error(message);
         }
+    },
+
+    /**
+     * @param {!WebInspector.RemoteObject} remoteObject
+     */
+    _showTypeDefinition: function(remoteObject)
+    {
+        var callback = this._didGetFunctionOrGeneratorObjectDetails.bind(this);
+        remoteObject.getOwnProperties(function(properties){
+            if (properties) {
+                properties.forEach(function(property) {
+                    if ("__proto__" === property.name) {
+                        property.value.getOwnProperties(function(properties){
+                            if (properties) {
+                                properties.forEach(function(property) {
+                                    if ("constructor" === property.name) {
+                                        var debuggerModel = remoteObject.target().debuggerModel;
+                                        debuggerModel.functionDetails(property.value, callback);
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+        });
     },
 
     /**
