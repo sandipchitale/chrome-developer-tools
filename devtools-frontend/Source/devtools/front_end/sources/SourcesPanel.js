@@ -1116,40 +1116,43 @@ WebInspector.SourcesPanel.prototype = {
             if (description) {
                 var matches = /function (.+)\(.*/.exec(description);
                 if (matches && matches[1]) {
-                    var className = matches[1];
-
-                    var xhr = new XMLHttpRequest();
-
-                    var urlPrefixes = [
-                        "https://developer.mozilla.org/en-US/docs/Web/API/",
-                        "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/",
-                        "https://developer.mozilla.org/de/docs/DOM/window.",
-                        null
-                    ];
-
-                    function showPage(i) {
-                        xhr.open("HEAD", urlPrefixes[i] + className, true);
-                        xhr.onreadystatechange = function()
-                        {
-                            if (xhr.readyState !== XMLHttpRequest.DONE)
-                                return;
-                            xhr.onreadystatechange = null;
-                            if (xhr.status !== 200) {
-                                if (urlPrefixes[i+1]) {
-                                    xhr.onreadystatechange = null;
-                                    showPage(i+1);
-                                }
-                                return;
-                            }
-                            xhr.onreadystatechange = null;
-                            InspectorFrontendHost.openInNewTab(urlPrefixes[i] + className);
-                        }
-                        xhr.send(null);
-                    }
-                    showPage(0);
+                    this._showApi(matches[1]);
                 }
             }
         }
+    },
+
+    _showApi: function(api)
+    {
+        var xhr = new XMLHttpRequest();
+
+        var urlPrefixes = [
+            "https://developer.mozilla.org/en-US/docs/Web/API/",
+            "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/",
+            "https://developer.mozilla.org/de/docs/DOM/window.",
+            null
+        ];
+
+        function showPage(i) {
+            xhr.open("HEAD", urlPrefixes[i] + api, true);
+            xhr.onreadystatechange = function()
+            {
+                if (xhr.readyState !== XMLHttpRequest.DONE)
+                    return;
+                xhr.onreadystatechange = null;
+                if (xhr.status !== 200) {
+                    if (urlPrefixes[i+1]) {
+                        xhr.onreadystatechange = null;
+                        showPage(i+1);
+                    }
+                    return;
+                }
+                xhr.onreadystatechange = null;
+                InspectorFrontendHost.openInNewTab(urlPrefixes[i] + api);
+            }
+            xhr.send(null);
+        }
+        showPage(0);
     },
 
     showGoToSourceDialog: function()
