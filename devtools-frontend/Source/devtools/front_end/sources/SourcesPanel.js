@@ -963,10 +963,10 @@ WebInspector.SourcesPanel.prototype = {
         contextMenu.appendItem(WebInspector.UIString.capitalize("Store as ^global ^variable"), this._saveToTempVariable.bind(this, remoteObject));
         if (remoteObject.type === "function")
             contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^function ^definition"), this._showFunctionDefinition.bind(this, remoteObject));
-        if (remoteObject.type === "object" && "array" !== remoteObject.subtype && remoteObject.description !== "Object")
-            contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^type ^definition"), this._showTypeDefinition.bind(this, remoteObject));
         if (remoteObject.subtype === "generator")
             contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^generator ^location"), this._showGeneratorLocation.bind(this, remoteObject));
+        if (remoteObject.type === "object" && "array" !== remoteObject.subtype)
+            contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^class ^definition"), this._showClassDefinition.bind(this, remoteObject));
     },
 
     /**
@@ -1053,33 +1053,6 @@ WebInspector.SourcesPanel.prototype = {
     /**
      * @param {!WebInspector.RemoteObject} remoteObject
      */
-    _showTypeDefinition: function(remoteObject)
-    {
-    	var that = this;
-        remoteObject.getOwnProperties(function(properties){
-            if (properties) {
-                properties.forEach(function(property) {
-                    if ("__proto__" === property.name) {
-                        property.value.getOwnProperties(function(properties){
-                            if (properties) {
-                                properties.forEach(function(property) {
-                                    if ("constructor" === property.name) {
-                                        var debuggerModel = remoteObject.target().debuggerModel;
-                                        debuggerModel.functionDetails(property.value, 
-                                        		that._didGetFunctionOrGeneratorObjectDetails.bind(that, property.value));
-                                    }
-                                });
-                            }
-                        });
-                    }
-                });
-            }
-        });
-    },
-
-    /**
-     * @param {!WebInspector.RemoteObject} remoteObject
-     */
     _showFunctionDefinition: function(remoteObject)
     {
         var debuggerModel = remoteObject.target().debuggerModel;
@@ -1096,58 +1069,86 @@ WebInspector.SourcesPanel.prototype = {
     },
 
     /**
+     * @param {!WebInspector.RemoteObject} remoteObject
+     */
+    _showClassDefinition: function(remoteObject)
+    {
+        var that = this;
+        remoteObject.getOwnProperties(function(properties){
+            if (properties) {
+                properties.forEach(function(property) {
+                    if ("__proto__" === property.name) {
+                        property.value.getOwnProperties(function(properties){
+                            if (properties) {
+                                properties.forEach(function(property) {
+                                    if ("constructor" === property.name) {
+                                        var debuggerModel = remoteObject.target().debuggerModel;
+                                        debuggerModel.functionDetails(property.value,
+                                                that._didGetFunctionOrGeneratorObjectDetails.bind(that, property.value));
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    },
+
+    /**
+     * @param {!WebInspector.RemoteObject} functionObject
      * @param {?{location: ?WebInspector.DebuggerModel.Location}} response
      */
     _didGetFunctionOrGeneratorObjectDetails: function(functionObject, response)
     {
         if (response && response.location) {
-        	var location = response.location;
-        	if (location) {
-        		var uiLocation = WebInspector.debuggerWorkspaceBinding.rawLocationToUILocation(location);
-        		if (uiLocation) {
-        			this.showUILocation(uiLocation, true);
-        			return;
-        		}
-        	}
+            var location = response.location;
+            if (location) {
+                var uiLocation = WebInspector.debuggerWorkspaceBinding.rawLocationToUILocation(location);
+                if (uiLocation) {
+                    this.showUILocation(uiLocation, true);
+                    return;
+                }
+            }
         }
-        if (functionObject && functionObject._domModel) {
-        	var description = functionObject.description;
-        	if (description) {
-        		var matches = /function (.+)\(.*/.exec(description);
-        		if (matches && matches[1]) {
-        			var className = matches[1];
+        if (functionObject) {
+            var description = functionObject.description;
+            if (description) {
+                var matches = /function (.+)\(.*/.exec(description);
+                if (matches && matches[1]) {
+                    var className = matches[1];
 
-        			var xhr = new XMLHttpRequest();
+                    var xhr = new XMLHttpRequest();
 
-        			var urlPrefixes = [
-	                    "https://developer.mozilla.org/en-US/docs/Web/API/",
-        			    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/",
-        			    "https://developer.mozilla.org/de/docs/DOM/window.",
-        			    null
+                    var urlPrefixes = [
+                        "https://developer.mozilla.org/en-US/docs/Web/API/",
+                        "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/",
+                        "https://developer.mozilla.org/de/docs/DOM/window.",
+                        null
                     ];
-        			
-        			function showPage(i) {
-        				xhr.open("HEAD", urlPrefixes[i] + className, true);
-        				xhr.onreadystatechange = function()
-            	        {
-            	            if (xhr.readyState !== XMLHttpRequest.DONE)
-            	                return;
-            	            xhr.onreadystatechange = null;
-            	            if (xhr.status !== 200) {
-            	            	if (urlPrefixes[i+1]) {
-            	            		xhr.onreadystatechange = null;
-            	            		showPage(i+1);
-            	            	}
-            	                return;
-            	            }
-            	            xhr.onreadystatechange = null;
-            	            InspectorFrontendHost.openInNewTab(urlPrefixes[i] + className);
-            	        }
-        				xhr.send(null);
-        			}
-        			showPage(0);
-        		}
-        	}
+
+                    function showPage(i) {
+                        xhr.open("HEAD", urlPrefixes[i] + className, true);
+                        xhr.onreadystatechange = function()
+                        {
+                            if (xhr.readyState !== XMLHttpRequest.DONE)
+                                return;
+                            xhr.onreadystatechange = null;
+                            if (xhr.status !== 200) {
+                                if (urlPrefixes[i+1]) {
+                                    xhr.onreadystatechange = null;
+                                    showPage(i+1);
+                                }
+                                return;
+                            }
+                            xhr.onreadystatechange = null;
+                            InspectorFrontendHost.openInNewTab(urlPrefixes[i] + className);
+                        }
+                        xhr.send(null);
+                    }
+                    showPage(0);
+                }
+            }
         }
     },
 
