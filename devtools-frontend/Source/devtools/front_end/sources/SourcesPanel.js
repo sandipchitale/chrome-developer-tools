@@ -1055,7 +1055,7 @@ WebInspector.SourcesPanel.prototype = {
      */
     _showTypeDefinition: function(remoteObject)
     {
-        var callback = this._didGetFunctionOrGeneratorObjectDetails.bind(this);
+    	var that = this;
         remoteObject.getOwnProperties(function(properties){
             if (properties) {
                 properties.forEach(function(property) {
@@ -1065,7 +1065,8 @@ WebInspector.SourcesPanel.prototype = {
                                 properties.forEach(function(property) {
                                     if ("constructor" === property.name) {
                                         var debuggerModel = remoteObject.target().debuggerModel;
-                                        debuggerModel.functionDetails(property.value, callback);
+                                        debuggerModel.functionDetails(property.value, 
+                                        		that._didGetFunctionOrGeneratorObjectDetails.bind(that, property.value));
                                     }
                                 });
                             }
@@ -1082,7 +1083,7 @@ WebInspector.SourcesPanel.prototype = {
     _showFunctionDefinition: function(remoteObject)
     {
         var debuggerModel = remoteObject.target().debuggerModel;
-        debuggerModel.functionDetails(remoteObject, this._didGetFunctionOrGeneratorObjectDetails.bind(this));
+        debuggerModel.functionDetails(remoteObject, this._didGetFunctionOrGeneratorObjectDetails.bind(this, remoteObject));
     },
 
     /**
@@ -1091,24 +1092,33 @@ WebInspector.SourcesPanel.prototype = {
     _showGeneratorLocation: function(remoteObject)
     {
         var debuggerModel = remoteObject.target().debuggerModel;
-        debuggerModel.generatorObjectDetails(remoteObject, this._didGetFunctionOrGeneratorObjectDetails.bind(this));
+        debuggerModel.generatorObjectDetails(remoteObject, this._didGetFunctionOrGeneratorObjectDetails.bind(this, remoteObject));
     },
 
     /**
      * @param {?{location: ?WebInspector.DebuggerModel.Location}} response
      */
-    _didGetFunctionOrGeneratorObjectDetails: function(response)
+    _didGetFunctionOrGeneratorObjectDetails: function(functionObject, response)
     {
-        if (!response || !response.location)
-            return;
-
-        var location = response.location;
-        if (!location)
-            return;
-
-        var uiLocation = WebInspector.debuggerWorkspaceBinding.rawLocationToUILocation(location);
-        if (uiLocation)
-            this.showUILocation(uiLocation, true);
+        if (response && response.location) {
+        	var location = response.location;
+        	if (location) {
+        		var uiLocation = WebInspector.debuggerWorkspaceBinding.rawLocationToUILocation(location);
+        		if (uiLocation) {
+        			this.showUILocation(uiLocation, true);
+        			return;
+        		}
+        	}
+        }
+        if (functionObject && functionObject._domModel) {
+        	var description = functionObject.description;
+        	if (description) {
+        		var matches = /function (.+)\(.*/.exec(description);
+        		if (matches && matches[1]) {
+        			InspectorFrontendHost.openInNewTab("https://developer.mozilla.org/en-US/docs/Web/API/" + matches[1]);
+        		}
+        	}
+        }
     },
 
     showGoToSourceDialog: function()
