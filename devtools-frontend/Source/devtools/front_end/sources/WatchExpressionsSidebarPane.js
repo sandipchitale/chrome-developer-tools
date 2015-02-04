@@ -36,10 +36,7 @@ WebInspector.WatchExpressionsSidebarPane = function()
 {
     WebInspector.SidebarPane.call(this, WebInspector.UIString("Watch Expressions"));
 
-    /** @type {!WebInspector.ObjectPropertiesMemento} */
-    this.memento = new WebInspector.ObjectPropertiesMemento();
-
-    this.section = new WebInspector.WatchExpressionsSection(this.memento);
+    this.section = new WebInspector.WatchExpressionsSection();
     this.bodyElement.appendChild(this.section.element);
 
     var refreshButton = this.titleElement.createChild("button", "pane-title-button refresh");
@@ -103,16 +100,12 @@ WebInspector.WatchExpressionsSidebarPane.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.PropertiesSection}
- * @param {!WebInspector.ObjectPropertiesMemento} memento
  */
-WebInspector.WatchExpressionsSection = function(memento)
+WebInspector.WatchExpressionsSection = function()
 {
     this._watchObjectGroupId = "watch-group";
 
     WebInspector.PropertiesSection.call(this, "");
-
-    this.memento = memento;
-
     this.treeElementConstructor = WebInspector.ObjectPropertyTreeElement;
     this.skipProto = false;
 
@@ -229,8 +222,6 @@ WebInspector.WatchExpressionsSection.prototype = {
      */
     updateProperties: function(properties)
     {
-        this.memento.forgetProperties();
-
         this.propertiesTreeOutline.removeChildren();
         WebInspector.ObjectPropertyTreeElement.populateWithProperties(this.propertiesTreeOutline, properties, [],
             WebInspector.WatchExpressionTreeElement, WebInspector.WatchExpressionsSection.CompareProperties, false, null);

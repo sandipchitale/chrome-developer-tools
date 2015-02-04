@@ -1395,7 +1395,6 @@
                 "name": "loadResourceForFrontend",
                 "async": true,
                 "parameters": [
-                    { "name": "frameId", "$ref": "Page.FrameId", "description": "Frame to load the resource from." },
                     { "name": "url", "type": "string", "description": "URL of the resource to load." },
                     { "name": "requestHeaders", "$ref": "Network.Headers", "optional": true, "description": "Request headers." }
                 ],
@@ -1538,6 +1537,18 @@
                     { "name": "requestId", "$ref": "RequestId", "description": "Request identifier." },
                     { "name": "timestamp", "$ref": "Timestamp", "description": "Timestamp." },
                     { "name": "response", "$ref": "WebSocketFrame", "description": "WebSocket response data." }
+                ],
+                "hidden": true
+            },
+            {
+                "name": "eventSourceMessageReceived",
+                "description": "Fired when EventSource message is received.",
+                "parameters": [
+                    { "name": "requestId", "$ref": "RequestId", "description": "Request identifier." },
+                    { "name": "timestamp", "$ref": "Timestamp", "description": "Timestamp." },
+                    { "name": "eventName", "type": "string", "description": "Message type." },
+                    { "name": "eventId", "type": "string", "description": "Message identifier." },
+                    { "name": "data", "type": "string", "description": "Message content." }
                 ],
                 "hidden": true
             }
@@ -2155,9 +2166,7 @@
                     { "name": "useCapture", "type": "boolean", "description": "<code>EventListener</code>'s useCapture." },
                     { "name": "isAttribute", "type": "boolean", "description": "<code>EventListener</code>'s isAttribute." },
                     { "name": "nodeId", "$ref": "NodeId", "description": "Target <code>DOMNode</code> id." },
-                    { "name": "handlerBody", "type": "string", "description": "Event handler function body." },
                     { "name": "location", "$ref": "Debugger.Location", "description": "Handler code location." },
-                    { "name": "sourceName", "type": "string", "optional": true, "description": "Source script URL." },
                     { "name": "handler", "$ref": "Runtime.RemoteObject", "optional": true, "description": "Event handler function value." }
                 ],
                 "description": "DOM interaction is implemented in terms of mirror objects that represent the actual DOM nodes. DOMNode is a base node mirror type."
@@ -3699,6 +3708,7 @@
                     { "name": "endLine", "type": "integer", "description": "Last line of the script." },
                     { "name": "endColumn", "type": "integer", "description": "Length of the last line of the script." },
                     { "name": "isContentScript", "type": "boolean", "optional": true, "description": "Determines whether this script is a user extension script." },
+                    { "name": "isInternalScript", "type": "boolean", "optional": true, "description": "Determines whether this script is an internal script.", "hidden": true },
                     { "name": "sourceMapURL", "type": "string", "optional": true, "description": "URL of source map associated with script (if any)." },
                     { "name": "hasSourceURL", "type": "boolean", "optional": true, "description": "True, if this script has sourceURL.", "hidden": true }
                 ],
@@ -3714,6 +3724,7 @@
                     { "name": "endLine", "type": "integer", "description": "Last line of the script." },
                     { "name": "endColumn", "type": "integer", "description": "Length of the last line of the script." },
                     { "name": "isContentScript", "type": "boolean", "optional": true, "description": "Determines whether this script is a user extension script." },
+                    { "name": "isInternalScript", "type": "boolean", "optional": true, "description": "Determines whether this script is an internal script.", "hidden": true },
                     { "name": "sourceMapURL", "type": "string", "optional": true, "description": "URL of source map associated with script (if any)." },
                     { "name": "hasSourceURL", "type": "boolean", "optional": true, "description": "True, if this script has sourceURL.", "hidden": true }
                 ],
@@ -4668,7 +4679,8 @@
                     { "name": "playbackRate", "type": "number", "description": "<code>AnimationPlayer</code>'s playback rate." },
                     { "name": "startTime", "type": "number", "description": "<code>AnimationPlayer</code>'s start time." },
                     { "name": "currentTime", "type": "number", "description": "<code>AnimationPlayer</code>'s current time." },
-                    { "name": "source", "$ref": "AnimationNode", "description": "<code>AnimationPlayer</code>'s source animation node." }
+                    { "name": "source", "$ref": "AnimationNode", "description": "<code>AnimationPlayer</code>'s source animation node." },
+                    { "name": "type", "type": "string", "enum": ["CSSTransition", "CSSAnimation", "WebAnimation"], "description": "Animation type of <code>AnimationPlayer</code>." }
                 ],
                 "description": "AnimationPlayer instance."
             },

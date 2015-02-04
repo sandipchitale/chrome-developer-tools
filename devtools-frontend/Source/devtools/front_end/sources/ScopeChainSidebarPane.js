@@ -34,8 +34,8 @@ WebInspector.ScopeChainSidebarPane = function()
     this._sections = [];
     /** @type {!Set.<?string>} */
     this._expandedSections = new Set();
-    /** @type {!WebInspector.ObjectPropertiesMemento} */
-    this.memento = new WebInspector.ObjectPropertiesMemento();
+    /** @type {!Set.<string>} */
+    this._expandedProperties = new Set();
 }
 
 WebInspector.ScopeChainSidebarPane.prototype = {
@@ -128,8 +128,9 @@ WebInspector.ScopeChainSidebarPane.prototype = {
             else
                 var scopeObject = runtimeModel.createRemoteObject(scope.object);
 
-            var section = new WebInspector.ObjectPropertiesSection(scopeObject, title, subtitle, emptyPlaceholder, true, extraProperties, WebInspector.ScopeVariableTreeElement, this.memento);
+            var section = new WebInspector.ObjectPropertiesSection(scopeObject, title, subtitle, emptyPlaceholder, true, extraProperties, WebInspector.ScopeVariableTreeElement);
             section.editInSelectedCallFrameWhenPaused = true;
+            section.pane = this;
 
             if (scope.type === DebuggerAgent.ScopeType.Global)
                 section.collapse();
@@ -143,7 +144,6 @@ WebInspector.ScopeChainSidebarPane.prototype = {
 
     __proto__: WebInspector.SidebarPane.prototype
 }
-
 
 /**
  * @constructor
@@ -159,18 +159,18 @@ WebInspector.ScopeVariableTreeElement.prototype = {
     onattach: function()
     {
         WebInspector.ObjectPropertyTreeElement.prototype.onattach.call(this);
-        if (this.hasChildren && this.treeOutline.section.memento.isPropertyPathExpanded(this.propertyPath()))
+        if (this.hasChildren && this.treeOutline.section.pane._expandedProperties.has(this.propertyPath()))
             this.expand();
     },
 
     onexpand: function()
     {
-        this.treeOutline.section.memento.addExpandedPropertyPath(this.propertyPath());
+        this.treeOutline.section.pane._expandedProperties.add(this.propertyPath());
     },
 
     oncollapse: function()
     {
-        this.treeOutline.section.memento.deleteExpandedPropertyPath(this.propertyPath());
+        this.treeOutline.section.pane._expandedProperties.delete(this.propertyPath());
     },
 
     /**
