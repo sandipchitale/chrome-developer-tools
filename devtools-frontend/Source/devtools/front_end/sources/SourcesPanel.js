@@ -965,8 +965,14 @@ WebInspector.SourcesPanel.prototype = {
             contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^function ^definition"), this._showFunctionDefinition.bind(this, remoteObject));
         if (remoteObject.subtype === "generator")
             contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^generator ^location"), this._showGeneratorLocation.bind(this, remoteObject));
-        if (remoteObject.type === "object" && "array" !== remoteObject.subtype)
-            contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^class ^definition"), this._showClassDefinition.bind(this, remoteObject));
+        if (remoteObject.type === "object")
+            contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^constructor ^definition"), this._showConstructorDefinitionOrDocumentation.bind(this, true, remoteObject));
+        if (Runtime.experiments.isEnabled("showFunctionDocumentation")) {
+            if (remoteObject.type === "function")
+                contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^function ^documentation"), this._showFunctionDocumentation.bind(this, remoteObject));
+            if (remoteObject.type === "object")
+                contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^constructor ^documentation"), this._showConstructorDefinitionOrDocumentation.bind(this, false, remoteObject));
+        }
     },
 
     /**
@@ -1056,7 +1062,7 @@ WebInspector.SourcesPanel.prototype = {
     _showFunctionDefinition: function(remoteObject)
     {
         var debuggerModel = remoteObject.target().debuggerModel;
-        debuggerModel.functionDetails(remoteObject, this._didGetFunctionOrGeneratorObjectDetails.bind(this, remoteObject));
+        debuggerModel.functionDetails(remoteObject, this._didGetFunctionOrGeneratorObjectDetails.bind(this));
     },
 
     /**
@@ -1065,52 +1071,61 @@ WebInspector.SourcesPanel.prototype = {
     _showGeneratorLocation: function(remoteObject)
     {
         var debuggerModel = remoteObject.target().debuggerModel;
-        debuggerModel.generatorObjectDetails(remoteObject, this._didGetFunctionOrGeneratorObjectDetails.bind(this, remoteObject));
+        debuggerModel.generatorObjectDetails(remoteObject, this._didGetFunctionOrGeneratorObjectDetails.bind(this));
     },
 
     /**
+     * @param {?{location: ?WebInspector.DebuggerModel.Location}} response
+     */
+    _didGetFunctionOrGeneratorObjectDetails: function(response)
+    {
+        if (!response || !response.location)
+            return;
+
+        var location = response.location;
+        if (!location)
+            return;
+
+        var uiLocation = WebInspector.debuggerWorkspaceBinding.rawLocationToUILocation(location);
+        if (uiLocation)
+            this.showUILocation(uiLocation, true);
+    },
+
+    /**
+     * @param {boolean=} definition
      * @param {!WebInspector.RemoteObject} remoteObject
      */
-    _showClassDefinition: function(remoteObject)
+    _showConstructorDefinitionOrDocumentation: function(definition, remoteObject)
     {
         var that = this;
-        remoteObject.getOwnProperties(function(properties){
-            if (properties) {
-                properties.forEach(function(property) {
-                    if ("__proto__" === property.name) {
-                        property.value.getOwnProperties(function(properties){
-                            if (properties) {
-                                properties.forEach(function(property) {
-                                    if ("constructor" === property.name) {
-                                        var debuggerModel = remoteObject.target().debuggerModel;
-                                        debuggerModel.functionDetails(property.value,
-                                                that._didGetFunctionOrGeneratorObjectDetails.bind(that, property.value));
-                                    }
-                                });
-                            }
-                        });
+        function processOwnProperties(properties) {
+            function processIfProto(property) {
+                function processProtoOwnProperties(properties) {
+                    function processIfConstructor(property) {
+                        if ("constructor" === property.name) {
+                            if (definition) {
+                                var debuggerModel = remoteObject.target().debuggerModel;
+                                debuggerModel.functionDetails(property.value, that._didGetFunctionOrGeneratorObjectDetails.bind(that));
+                            } else
+                                that._showFunctionDocumentation(property.value);
+                        }
                     }
-                });
+                    if (properties)
+                        properties.forEach(processIfConstructor);
+                }
+                if ("__proto__" === property.name)
+                    property.value.getOwnProperties(processProtoOwnProperties);
             }
-        });
+            if (properties)
+                properties.forEach(processIfProto);
+        }
+        remoteObject.getOwnProperties(processOwnProperties);
     },
 
     /**
      * @param {!WebInspector.RemoteObject} functionObject
-     * @param {?{location: ?WebInspector.DebuggerModel.Location}} response
      */
-    _didGetFunctionOrGeneratorObjectDetails: function(functionObject, response)
-    {
-        if (response && response.location) {
-            var location = response.location;
-            if (location) {
-                var uiLocation = WebInspector.debuggerWorkspaceBinding.rawLocationToUILocation(location);
-                if (uiLocation) {
-                    this.showUILocation(uiLocation, true);
-                    return;
-                }
-            }
-        }
+    _showFunctionDocumentation: function(functionObject) {
         if (functionObject) {
             var description = functionObject.description;
             if (description) {
@@ -1122,33 +1137,38 @@ WebInspector.SourcesPanel.prototype = {
         }
     },
 
+    /**
+     * @param {string} api
+     */
     _showApi: function(api)
     {
+        const apiToken = "{api}";
         var xhr = new XMLHttpRequest();
 
         var urlPrefixes = [
-            "https://developer.mozilla.org/en-US/docs/Web/API/",
-            "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/",
-            "https://developer.mozilla.org/de/docs/DOM/window.",
+            "https://developer.mozilla.org/en-US/docs/Web/API/" + apiToken,
+            "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/" + apiToken,
+            "https://developer.mozilla.org/de/docs/DOM/window." + apiToken,
             null
         ];
 
         function showPage(i) {
-            xhr.open("HEAD", urlPrefixes[i] + api, true);
+            var url = urlPrefixes[i];
+            if (!url)
+                return;
+            url = url.replace(apiToken, api);
+            xhr.open("HEAD", url, true);
             xhr.onreadystatechange = function()
             {
                 if (xhr.readyState !== XMLHttpRequest.DONE)
                     return;
                 xhr.onreadystatechange = null;
                 if (xhr.status !== 200) {
-                    if (urlPrefixes[i+1]) {
-                        xhr.onreadystatechange = null;
-                        showPage(i+1);
-                    }
+                    showPage(i+1);
                     return;
                 }
                 xhr.onreadystatechange = null;
-                InspectorFrontendHost.openInNewTab(urlPrefixes[i] + api);
+                InspectorFrontendHost.openInNewTab(url);
             }
             xhr.send(null);
         }

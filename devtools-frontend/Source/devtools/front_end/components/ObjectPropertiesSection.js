@@ -34,9 +34,8 @@
  * @param {boolean=} ignoreHasOwnProperty
  * @param {!Array.<!WebInspector.RemoteObjectProperty>=} extraProperties
  * @param {function(new:TreeElement, !WebInspector.RemoteObjectProperty)=} treeElementConstructor
- * @param {?WebInspector.ObjectPropertiesMemento=} memento
  */
-WebInspector.ObjectPropertiesSection = function(object, title, subtitle, emptyPlaceholder, ignoreHasOwnProperty, extraProperties, treeElementConstructor, memento)
+WebInspector.ObjectPropertiesSection = function(object, title, subtitle, emptyPlaceholder, ignoreHasOwnProperty, extraProperties, treeElementConstructor)
 {
     this._emptyPlaceholder = emptyPlaceholder;
     this.object = object;
@@ -45,10 +44,6 @@ WebInspector.ObjectPropertiesSection = function(object, title, subtitle, emptyPl
     this.treeElementConstructor = treeElementConstructor || WebInspector.ObjectPropertyTreeElement;
     this.editable = true;
     this.skipProto = false;
-    /**
-     * @private
-     */
-    this.memento = memento;
 
     WebInspector.PropertiesSection.call(this, title || "", subtitle);
 }
@@ -99,9 +94,6 @@ WebInspector.ObjectPropertiesSection.prototype = {
 
     updateProperties: function(properties, internalProperties, rootTreeElementConstructor, rootPropertyComparer)
     {
-        if (this.memento)
-            this.memento.forgetProperties();
-
         if (!rootTreeElementConstructor)
             rootTreeElementConstructor = this.treeElementConstructor;
 
@@ -144,66 +136,6 @@ WebInspector.ObjectPropertiesSection.CompareProperties = function(propertyA, pro
     if (propertyB.symbol && !propertyA.symbol)
         return -1;
     return String.naturalOrderComparator(a, b);
-}
-
-/**
- * @constructor
- */
-WebInspector.ObjectPropertiesMemento = function()
-{
-    this._expandedProperties = new Set();
-    this._lastDescriptions = {};
-    this._propertyIdentifiers = {};
-}
-
-WebInspector.ObjectPropertiesMemento.prototype = {
-    /**
-     * @return {boolean}
-     */
-    isPropertyPathExpanded: function(propertyPath)
-    {
-        return this._expandedProperties.has(propertyPath);
-    },
-    addExpandedPropertyPath: function(propertyPath)
-    {
-        this._expandedProperties.add(propertyPath);
-    },
-    deleteExpandedPropertyPath: function(propertyPath)
-    {
-        this._expandedProperties['delete'](propertyPath);
-    },
-    forgetProperties: function()
-    {
-        for (var pi in this._lastDescriptions)
-        {
-            if (!(pi in this._propertyIdentifiers))
-                delete this._lastDescriptions[pi];
-        }
-        this._propertyIdentifiers = {};
-    },
-    /**
-     * @param {!WebInspector.ObjectPropertyTreeElement} objectPropertyTreeElement
-     */
-    recordAndDecorate: function(objectPropertyTreeElement)
-    {
-        var propertyPath = objectPropertyTreeElement.propertyPath();
-        if (Runtime.experiments.isEnabled("highlightChangedProperties") && propertyPath) {
-            this._propertyIdentifiers[propertyPath] = 1;
-            var lastDesription = this._lastDescriptions[propertyPath];
-            var hadProperty = (lastDesription != undefined);
-            var description = (objectPropertyTreeElement.property.value.type + ":" +
-                    (objectPropertyTreeElement.property.value.subtype? objectPropertyTreeElement.property.value.subtype : "") + ":" +
-                    /* (objectPropertyTreeElement.property.value.objectId ? objectPropertyTreeElement.property.value.objectId : "") + ":" + */
-                    objectPropertyTreeElement.property.value.description);
-            var descriptionChanged = (!hadProperty) || (description != lastDesription);
-            this._lastDescriptions[propertyPath] = description;
-
-            if (descriptionChanged)
-                objectPropertyTreeElement.valueElement.classList.add("highlighted-search-result");
-            if (!hadProperty)
-                objectPropertyTreeElement.nameElement.classList.add("highlighted-search-result");
-        }
-    }
 }
 
 /**
@@ -608,17 +540,6 @@ WebInspector.ObjectPropertyTreeElement.populate = function(treeElement, value, e
 WebInspector.ObjectPropertyTreeElement.populateWithProperties = function(treeNode, properties, internalProperties, treeElementConstructor, comparator, skipProto, value, emptyPlaceholder) {
     properties.sort(comparator);
 
-    function appendChild(treeElement) {
-        treeNode.appendChild(treeElement);
-        if (treeElement instanceof WebInspector.ObjectPropertyTreeElement) {
-            var treeElementPropertyPath = treeElement.propertyPath();
-            if (Runtime.experiments.isEnabled("highlightChangedProperties") &&
-                    treeElementPropertyPath &&
-                    treeNode.treeOutline.section.memento)
-                treeNode.treeOutline.section.memento.recordAndDecorate(treeElement);
-        }
-    }
-
     for (var i = 0; i < properties.length; ++i) {
         var property = properties[i];
         if (skipProto && property.name === "__proto__")
@@ -626,29 +547,29 @@ WebInspector.ObjectPropertyTreeElement.populateWithProperties = function(treeNod
         if (property.isAccessorProperty()) {
             if (property.name !== "__proto__" && property.getter) {
                 property.parentObject = value;
-                appendChild(new treeElementConstructor(property));
+                treeNode.appendChild(new treeElementConstructor(property));
             }
             if (property.isOwn) {
                 if (property.getter) {
                     var getterProperty = new WebInspector.RemoteObjectProperty("get " + property.name, property.getter);
                     getterProperty.parentObject = value;
-                    appendChild(new treeElementConstructor(getterProperty));
+                    treeNode.appendChild(new treeElementConstructor(getterProperty));
                 }
                 if (property.setter) {
                     var setterProperty = new WebInspector.RemoteObjectProperty("set " + property.name, property.setter);
                     setterProperty.parentObject = value;
-                    appendChild(new treeElementConstructor(setterProperty));
+                    treeNode.appendChild(new treeElementConstructor(setterProperty));
                 }
             }
         } else {
             property.parentObject = value;
-            appendChild(new treeElementConstructor(property));
+            treeNode.appendChild(new treeElementConstructor(property));
         }
     }
     if (internalProperties) {
         for (var i = 0; i < internalProperties.length; i++) {
             internalProperties[i].parentObject = value;
-            appendChild(new treeElementConstructor(internalProperties[i]));
+            treeNode.appendChild(new treeElementConstructor(internalProperties[i]));
         }
     }
     if (value && value.type === "function") {
@@ -666,10 +587,10 @@ WebInspector.ObjectPropertyTreeElement.populateWithProperties = function(treeNod
             }
         }
         if (!hasTargetFunction)
-            appendChild(new WebInspector.FunctionScopeMainTreeElement(value));
+            treeNode.appendChild(new WebInspector.FunctionScopeMainTreeElement(value));
     }
     if (value && value.type === "object" && (value.subtype === "map" || value.subtype === "set" || value.subtype === "iterator"))
-        appendChild(new WebInspector.CollectionEntriesMainTreeElement(value));
+        treeNode.appendChild(new WebInspector.CollectionEntriesMainTreeElement(value));
 
     WebInspector.ObjectPropertyTreeElement._appendEmptyPlaceholderIfNeeded(treeNode, emptyPlaceholder);
 }

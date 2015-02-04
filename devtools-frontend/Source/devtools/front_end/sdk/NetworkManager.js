@@ -112,6 +112,20 @@ WebInspector.NetworkManager.hasDevToolsRequestHeader = function(request)
     return !!request && !!request.requestHeaderValue(WebInspector.NetworkManager._devToolsRequestHeader);
 }
 
+/**
+ * @param {string} url
+ * @param {!NetworkAgent.Headers|undefined} headers
+ * @param {function(?Protocol.Error, number, !NetworkAgent.Headers, string)} callback
+ */
+WebInspector.NetworkManager.loadResourceForFrontend = function(url, headers, callback)
+{
+    var target = WebInspector.targetManager.mainTarget();
+    if (target)
+        target.networkAgent().loadResourceForFrontend(url, headers, callback);
+    else
+        callback("No target to load resource available", 0, {}, "");
+}
+
 WebInspector.NetworkManager.prototype = {
     /**
      * @param {string} url
@@ -522,6 +536,22 @@ WebInspector.NetworkDispatcher.prototype = {
         if (!networkRequest)
             return;
         this._finishNetworkRequest(networkRequest, time, -1);
+    },
+
+    /**
+     * @override
+     * @param {!NetworkAgent.RequestId} requestId
+     * @param {!NetworkAgent.Timestamp} time
+     * @param {string} eventName
+     * @param {string} eventId
+     * @param {string} data
+     */
+    eventSourceMessageReceived: function(requestId, time, eventName, eventId, data)
+    {
+        var networkRequest = this._inflightRequestsById[requestId];
+        if (!networkRequest)
+            return;
+        networkRequest.addEventSourceMessage(time, eventName, eventId, data);
     },
 
     /**
