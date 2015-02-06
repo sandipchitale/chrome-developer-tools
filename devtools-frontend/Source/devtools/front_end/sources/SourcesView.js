@@ -91,6 +91,10 @@ WebInspector.SourcesView.Events = {
  */
 WebInspector.SourcesView.uiSourceCodeHighlighterType = function(uiSourceCode)
 {
+    var networkContentType = WebInspector.networkProject.uiSourceCodeContentType(uiSourceCode);
+    if (networkContentType)
+        return networkContentType.canonicalMimeType();
+
     var mimeType = WebInspector.ResourceType.mimeTypesForExtensions[uiSourceCode.extension().toLowerCase()];
     return mimeType || uiSourceCode.contentType().canonicalMimeType();
 }
@@ -641,7 +645,7 @@ WebInspector.SourcesView.prototype = {
      * @return {boolean}
      */
     _showOutlineDialog: function(event)
-    {
+    {   	
         var uiSourceCode = this._editorContainer.currentFile();
         if (!uiSourceCode)
             return false;
@@ -649,7 +653,7 @@ WebInspector.SourcesView.prototype = {
         switch (uiSourceCode.contentType()) {
         case WebInspector.resourceTypes.Document:
         case WebInspector.resourceTypes.Script:
-            WebInspector.JavaScriptOutlineDialog.show(this, uiSourceCode, this.showSourceLocation.bind(this, uiSourceCode));
+            WebInspector.JavaScriptOutlineDialog.show(this, uiSourceCode, this.showSourceLocation.bind(this));
             return true;
         case WebInspector.resourceTypes.Stylesheet:
             WebInspector.StyleSheetOutlineDialog.show(this, uiSourceCode, this.showSourceLocation.bind(this, uiSourceCode));

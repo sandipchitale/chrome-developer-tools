@@ -187,7 +187,7 @@ WebInspector.NetworkLogView.prototype = {
      */
     targetAdded: function(target)
     {
-        target.networkLog.requests.forEach(this._appendRequest.bind(this));
+        target.networkLog.requests().forEach(this._appendRequest.bind(this));
     },
 
     /**
@@ -690,7 +690,7 @@ WebInspector.NetworkLogView.prototype = {
 
         var calculator = this.calculator();
         calculator.setDisplayWindow(this._timelineGrid.dividersElement.clientWidth);
-        this._timelineGrid.updateDividers(calculator);
+        this._timelineGrid.updateDividers(calculator, 50);
 
         if (calculator.startAtZero) {
             // If our current sorting method starts at zero, that means it shows all
@@ -990,7 +990,7 @@ WebInspector.NetworkLogView.prototype = {
 
         // Pick provisional load requests.
         var requestsToPick = [];
-        var requests = frame.target().networkLog.requests;
+        var requests = frame.target().networkLog.requests();
         for (var i = 0; i < requests.length; ++i) {
             var request = requests[i];
             if (request.loaderId === loaderId)

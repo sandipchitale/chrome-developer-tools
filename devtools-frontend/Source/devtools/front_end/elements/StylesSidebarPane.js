@@ -1445,7 +1445,7 @@ WebInspector.StylePropertiesSection = function(parentPane, styleRule)
     this.propertiesTreeOutline.section = this;
 
     var selectorContainer = createElement("div");
-    this._selectorElement = createElement("span");
+    this._selectorElement = createElementWithClass("span", "selector");
     this._selectorElement.textContent = styleRule.selectorText();
     selectorContainer.appendChild(this._selectorElement);
 
@@ -1839,11 +1839,8 @@ WebInspector.StylePropertiesSection.prototype = {
 
         this._mediaListElement.classList.toggle("media-matches", this.styleRule.mediaMatches());
 
-        // .selector is rendered as non-affecting selector by default.
-        if (!this.styleRule.hasMatchingSelectors()) {
-            this._selectorElement.className = "selector";
+        if (!this.styleRule.hasMatchingSelectors())
             return;
-        }
 
         var selectors = rule.selectors;
         var fragment = createDocumentFragment();
@@ -2454,7 +2451,7 @@ WebInspector.ComputedStylePropertiesSection.prototype = {
 WebInspector.BlankStylePropertiesSection = function(stylesPane, defaultSelectorText, styleSheetId, ruleLocation, insertAfterStyleRule)
 {
     var dummyCascade = new WebInspector.SectionCascade();
-    var blankSectionModel = dummyCascade.appendModelFromStyle(WebInspector.CSSStyleDeclaration.createDummyStyle(), defaultSelectorText);
+    var blankSectionModel = dummyCascade.appendModelFromStyle(WebInspector.CSSStyleDeclaration.createDummyStyle(stylesPane._target), defaultSelectorText);
     blankSectionModel.setEditable(true);
     WebInspector.StylePropertiesSection.call(this, stylesPane, blankSectionModel);
     this._ruleLocation = ruleLocation;
