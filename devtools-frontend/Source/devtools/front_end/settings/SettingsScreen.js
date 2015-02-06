@@ -902,10 +902,10 @@ WebInspector.ExperimentsSettingsTab.prototype = {
             documentationUrls.wrap = true;
             documentationUrls.style.overflow = "auto";
             documentationUrls.placeholder = "Enter URLs for API documentation.\n" +
-                    "Use '{api}' as placeholder for API name e.g.\n\n" +
-                    "https://developer.mozilla.org/en-US/docs/Web/API/{api}\n" +
+                    "Use '{api}' as placeholder for API name e.g.\n\n";
+            documentationUrls.value = "https://developer.mozilla.org/en-US/docs/Web/API/{api}\n" +
                     "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/{api}\n" +
-                    "https://developer.mozilla.org/de/docs/DOM/window.{api}";
+                    "https://developer.mozilla.org/de/docs/DOM/window.{api}"
             var documentationUrlsValue = window.localStorage["experiments.showFunctionDocumentation"];
             if (documentationUrlsValue) {
                 documentationUrls.value = documentationUrlsValue;
@@ -915,8 +915,11 @@ WebInspector.ExperimentsSettingsTab.prototype = {
                  window.localStorage["experiments.showFunctionDocumentation"] = documentationUrls.value;
             }
             documentationUrls.addEventListener("change", storeDocumentationUrlsValues);
-
-
+            function keydown(event) {
+                if (isEnterKey(event))
+                    event.consume();
+            }
+            documentationUrls.addEventListener("keydown", keydown);
             p.appendChild(documentationUrlsDiv);
         }
 
