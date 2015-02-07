@@ -645,7 +645,7 @@ WebInspector.SourcesView.prototype = {
      * @return {boolean}
      */
     _showOutlineDialog: function(event)
-    {   	
+    {
         var uiSourceCode = this._editorContainer.currentFile();
         if (!uiSourceCode)
             return false;

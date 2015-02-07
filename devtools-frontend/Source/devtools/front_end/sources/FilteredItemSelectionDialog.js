@@ -535,16 +535,11 @@ WebInspector.JavaScriptOutlineDialog = function(uiSourceCode, selectItemCallback
 
     this._functionItems = [];
     this._selectItemCallback = selectItemCallback;
-    this._outlineWorker = new WorkerRuntime.Worker("script_formatter_worker");
-    this._outlineWorker.onmessage = this._didBuildOutlineChunk.bind(this);
-    
-    this.uiSourceCodes = uiSourceCode.project().uiSourceCodes().filter(function(uic) { return uiSourceCode.contentType().name() == uic.contentType().name() }, this);
-    this._uic = this.uiSourceCodes.pop();
-    if (this._uic) {
-    	this._uic.requestContent((function() {    		
-    		this._outlineWorker.postMessage({ method: "javaScriptOutline", params: { content: this._uic.workingCopy() } });
-    	}).bind(this));
-    }
+    function uiSourceCodeInSameProject(uic) {
+        return uiSourceCode.contentType().name() === uic.contentType().name()
+    };
+    var uiSourceCodes = uiSourceCode.project().uiSourceCodes().filter(uiSourceCodeInSameProject);
+    this._processUiSourceCodes(uiSourceCodes);
 }
 
 /**
@@ -561,36 +556,41 @@ WebInspector.JavaScriptOutlineDialog.show = function(view, uiSourceCode, selectI
 }
 
 WebInspector.JavaScriptOutlineDialog.prototype = {
+
+    _processUiSourceCodes: function(uiSourceCodes) {
+        var uic = uiSourceCodes.pop();
+        if (uic) {
+            this._outlineWorker = new WorkerRuntime.Worker("script_formatter_worker");
+            this._outlineWorker.onmessage = this._didBuildOutlineChunk.bind(this, uic, uiSourceCodes);
+            function postMessage() {
+                this._outlineWorker.postMessage({ method: "javaScriptOutline", params: { content: uic.workingCopy() } });
+            }
+            uic.requestContent(postMessage.bind(this));
+        }
+    },
+
     /**
      * @param {!MessageEvent} event
      */
-    _didBuildOutlineChunk: function(event)
+    _didBuildOutlineChunk: function(uic, uiSourceCodes, event)
     {
         var data = /** @type {!WebInspector.JavaScriptOutlineDialog.MessageEventData} */ (event.data);
         var chunk = data.chunk;
         for (var i = 0; i < chunk.length; ++i) {
-        	var uri = this._uic.uri();
-        	var file = uri;
-        	var index = file.lastIndexOf("/");
-        	if (index !== -1) {
-        		file = file.substring(index+1);
-        	}
-        	this._functionItems.push({chunk: chunk[i], uri: uri, file: file, uic: this._uic});
+            var uri = uic.uri();
+            var file = uri;
+            var index = file.lastIndexOf("/");
+            if (index !== -1) {
+                file = file.substring(index+1);
+            }
+            this._functionItems.push({chunk: chunk[i], uri: uri, file: file, uic: uic});
         }
 
-        if (data.isLastChunk)
-        	this.dispose();
-        
-    	this._uic = this.uiSourceCodes.pop();
-        if (this._uic) {
-        	this._outlineWorker = new WorkerRuntime.Worker("script_formatter_worker");
-        	this._outlineWorker.onmessage = this._didBuildOutlineChunk.bind(this);
-        	this._uic.requestContent((function() {    		
-        		this._outlineWorker.postMessage({ method: "javaScriptOutline", params: { content: this._uic.workingCopy() } });
-        	}).bind(this));
+        if (data.isLastChunk) {
+            this.dispose();
+            this.refresh();
+            this._processUiSourceCodes(uiSourceCodes);
         }
-        else
-        	this.refresh();
     },
 
     /**
