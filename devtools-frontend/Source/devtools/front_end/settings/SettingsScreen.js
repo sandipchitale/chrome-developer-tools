@@ -903,9 +903,13 @@ WebInspector.ExperimentsSettingsTab.prototype = {
             documentationUrls.style.overflow = "auto";
             documentationUrls.placeholder = "Enter URLs for API documentation.\n" +
                     "Use '{api}' as placeholder for API name e.g.\n\n";
-            documentationUrls.value = "https://developer.mozilla.org/en-US/docs/Web/API/{api}\n" +
+            if (!window.localStorage["experiments.showFunctionDocumentation"]) {
+                window.localStorage["experiments.showFunctionDocumentation"] = "https://developer.mozilla.org/en-US/docs/Web/API/{api}\n" +
                     "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/{api}\n" +
                     "https://developer.mozilla.org/de/docs/DOM/window.{api}"
+            }
+            documentationUrls.value = window.localStorage["experiments.showFunctionDocumentation"];
+
             var documentationUrlsValue = window.localStorage["experiments.showFunctionDocumentation"];
             if (documentationUrlsValue) {
                 documentationUrls.value = documentationUrlsValue;
