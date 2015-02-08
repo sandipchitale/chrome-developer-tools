@@ -262,6 +262,7 @@ WebInspector.ShortcutsScreen.registerShortcuts = function()
     // Editing
     section = WebInspector.shortcutsScreen.section(WebInspector.UIString("Text Editor"));
     section.addAlternateKeys(WebInspector.ShortcutsScreen.SourcesPanelShortcuts.GoToMember, WebInspector.UIString("Go to member"));
+    section.addAlternateKeys(WebInspector.ShortcutsScreen.SourcesPanelShortcuts.GoToMemberAllFiles, WebInspector.UIString("Go to member all files"));
     section.addAlternateKeys(WebInspector.ShortcutsScreen.SourcesPanelShortcuts.ToggleAutocompletion, WebInspector.UIString("Autocompletion"));
     section.addAlternateKeys(WebInspector.ShortcutsScreen.SourcesPanelShortcuts.GoToLine, WebInspector.UIString("Go to line"));
     section.addAlternateKeys(WebInspector.ShortcutsScreen.SourcesPanelShortcuts.JumpToPreviousLocation, WebInspector.UIString("Jump to previous editing location"));
@@ -441,6 +442,10 @@ WebInspector.ShortcutsScreen.SourcesPanelShortcuts = {
 
     GoToMember: [
         WebInspector.KeyboardShortcut.makeDescriptor("p", WebInspector.KeyboardShortcut.Modifiers.CtrlOrMeta | WebInspector.KeyboardShortcut.Modifiers.Shift)
+    ],
+
+    GoToMemberAllFiles: [
+        WebInspector.KeyboardShortcut.makeDescriptor("p", WebInspector.KeyboardShortcut.Modifiers.CtrlOrMeta | WebInspector.KeyboardShortcut.Modifiers.Shift | WebInspector.KeyboardShortcut.Modifiers.Alt)
     ],
 
     GoToLine: [

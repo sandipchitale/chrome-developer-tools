@@ -120,8 +120,9 @@ WebInspector.SourcesView.prototype = {
         registerShortcut.call(this, WebInspector.ShortcutsScreen.SourcesPanelShortcuts.JumpToNextLocation, this._onJumpToNextLocation.bind(this));
         registerShortcut.call(this, WebInspector.ShortcutsScreen.SourcesPanelShortcuts.CloseEditorTab, this._onCloseEditorTab.bind(this));
         registerShortcut.call(this, WebInspector.ShortcutsScreen.SourcesPanelShortcuts.GoToLine, this._showGoToLineDialog.bind(this));
-        registerShortcut.call(this, WebInspector.ShortcutsScreen.SourcesPanelShortcuts.GoToMember, this._showOutlineDialog.bind(this));
-        registerShortcut.call(this, [WebInspector.KeyboardShortcut.makeDescriptor("o", WebInspector.KeyboardShortcut.Modifiers.CtrlOrMeta | WebInspector.KeyboardShortcut.Modifiers.Shift)], this._showOutlineDialog.bind(this));
+        registerShortcut.call(this, WebInspector.ShortcutsScreen.SourcesPanelShortcuts.GoToMember, this._showOutlineDialog.bind(this, false));
+        registerShortcut.call(this, WebInspector.ShortcutsScreen.SourcesPanelShortcuts.GoToMemberAllFiles, this._showOutlineDialog.bind(this, true));
+        registerShortcut.call(this, [WebInspector.KeyboardShortcut.makeDescriptor("o", WebInspector.KeyboardShortcut.Modifiers.CtrlOrMeta | WebInspector.KeyboardShortcut.Modifiers.Shift)], this._showOutlineDialog.bind(this, false));
         registerShortcut.call(this, WebInspector.ShortcutsScreen.SourcesPanelShortcuts.ToggleBreakpoint, this._toggleBreakpoint.bind(this));
         registerShortcut.call(this, WebInspector.ShortcutsScreen.SourcesPanelShortcuts.Save, this._save.bind(this));
         registerShortcut.call(this, WebInspector.ShortcutsScreen.SourcesPanelShortcuts.SaveAll, this._saveAll.bind(this));
@@ -644,7 +645,7 @@ WebInspector.SourcesView.prototype = {
      * @param {!Event=} event
      * @return {boolean}
      */
-    _showOutlineDialog: function(event)
+    _showOutlineDialog: function(allFiles, event)
     {
         var uiSourceCode = this._editorContainer.currentFile();
         if (!uiSourceCode)
@@ -653,7 +654,7 @@ WebInspector.SourcesView.prototype = {
         switch (uiSourceCode.contentType()) {
         case WebInspector.resourceTypes.Document:
         case WebInspector.resourceTypes.Script:
-            WebInspector.JavaScriptOutlineDialog.show(this, uiSourceCode, this.showSourceLocation.bind(this));
+            WebInspector.JavaScriptOutlineDialog.show(this, uiSourceCode, allFiles, this.showSourceLocation.bind(this));
             return true;
         case WebInspector.resourceTypes.Stylesheet:
             WebInspector.StyleSheetOutlineDialog.show(this, uiSourceCode, this.showSourceLocation.bind(this, uiSourceCode));

@@ -529,16 +529,21 @@ WebInspector.SelectionDialogContentProvider.prototype = {
  * @param {!WebInspector.UISourceCode} uiSourceCode
  * @param {function(number, number)} selectItemCallback
  */
-WebInspector.JavaScriptOutlineDialog = function(uiSourceCode, selectItemCallback)
+WebInspector.JavaScriptOutlineDialog = function(uiSourceCode, allFiles, selectItemCallback)
 {
     WebInspector.SelectionDialogContentProvider.call(this);
 
     this._functionItems = [];
+    this._allFiles = allFiles;
     this._selectItemCallback = selectItemCallback;
     function uiSourceCodeInSameProject(uic) {
         return uiSourceCode.contentType().name() === uic.contentType().name()
     };
-    var uiSourceCodes = uiSourceCode.project().uiSourceCodes().filter(uiSourceCodeInSameProject);
+    var uiSourceCodes ;
+    if (allFiles)
+        uiSourceCodes = uiSourceCode.project().uiSourceCodes().filter(uiSourceCodeInSameProject);
+    else
+        uiSourceCodes = [ uiSourceCode ];
     this._processUiSourceCodes(uiSourceCodes);
 }
 
@@ -547,11 +552,11 @@ WebInspector.JavaScriptOutlineDialog = function(uiSourceCode, selectItemCallback
  * @param {!WebInspector.UISourceCode} uiSourceCode
  * @param {function(number, number)} selectItemCallback
  */
-WebInspector.JavaScriptOutlineDialog.show = function(view, uiSourceCode, selectItemCallback)
+WebInspector.JavaScriptOutlineDialog.show = function(view, uiSourceCode, allFiles, selectItemCallback)
 {
     if (WebInspector.Dialog.currentInstance())
         return;
-    var filteredItemSelectionDialog = new WebInspector.FilteredItemSelectionDialog(new WebInspector.JavaScriptOutlineDialog(uiSourceCode, selectItemCallback));
+    var filteredItemSelectionDialog = new WebInspector.FilteredItemSelectionDialog(new WebInspector.JavaScriptOutlineDialog(uiSourceCode, allFiles, selectItemCallback));
     WebInspector.Dialog.show(view.element, filteredItemSelectionDialog);
 }
 
@@ -637,7 +642,7 @@ WebInspector.JavaScriptOutlineDialog.prototype = {
         var item = this._functionItems[itemIndex];
         titleElement.textContent = item.chunk.name + (item.chunk.arguments ? item.chunk.arguments : "");
         this.highlightRanges(titleElement, query);
-        subtitleElement.textContent = item.file + ":" + (item.chunk.line + 1);
+        subtitleElement.textContent = (this._allFiles ? item.file : "") + ":" + (item.chunk.line + 1);
         subtitleElement.title = item.uri;
     },
 
