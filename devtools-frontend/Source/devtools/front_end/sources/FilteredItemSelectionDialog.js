@@ -540,6 +540,8 @@ WebInspector.JavaScriptOutlineDialog = function(uiSourceCode, allFiles, selectIt
     if (allFiles) {
         uiSourceCodes = [];
         function filterUiSourceCode(uic) {
+            if (/^VM[0-9]+ .*/.test(uic.name()))
+                return false;
             return (uic.contentType() === WebInspector.resourceTypes.Document || uic.contentType() === WebInspector.resourceTypes.Script);
         };
         function processProject(project) {
