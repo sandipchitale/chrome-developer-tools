@@ -536,12 +536,17 @@ WebInspector.JavaScriptOutlineDialog = function(uiSourceCode, allFiles, selectIt
     this._functionItems = [];
     this._allFiles = allFiles;
     this._selectItemCallback = selectItemCallback;
-    function uiSourceCodeInSameProject(uic) {
-        return uiSourceCode.contentType().name() === uic.contentType().name()
-    };
-    var uiSourceCodes ;
-    if (allFiles)
-        uiSourceCodes = uiSourceCode.project().uiSourceCodes().filter(uiSourceCodeInSameProject);
+    var uiSourceCodes;
+    if (allFiles) {
+        uiSourceCodes = [];
+        function filterUiSourceCode(uic) {
+            return (uic.contentType() === WebInspector.resourceTypes.Document || uic.contentType() === WebInspector.resourceTypes.Script);
+        };
+        function processProject(project) {
+            uiSourceCodes = uiSourceCodes.concat(project.uiSourceCodes().filter(filterUiSourceCode, this));
+        }
+        WebInspector.workspace.projects().forEach(processProject, this);
+    }
     else
         uiSourceCodes = [ uiSourceCode ];
     this._processUiSourceCodes(uiSourceCodes);
