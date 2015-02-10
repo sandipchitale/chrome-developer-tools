@@ -539,8 +539,11 @@ WebInspector.JavaScriptOutlineDialog = function(uiSourceCode, allFiles, selectIt
     var uiSourceCodes;
     if (allFiles) {
         uiSourceCodes = [];
+        function sortUiSourceCode(a, b) {
+            return b.name().localeCompare(a.name());
+        }
         function filterUiSourceCode(uic) {
-            if (/^VM[0-9]+ .*/.test(uic.name()))
+            if (/^VM[0-9]+.*/.test(uic.name()))
                 return false;
             return (uic.contentType() === WebInspector.resourceTypes.Document || uic.contentType() === WebInspector.resourceTypes.Script);
         };
@@ -548,9 +551,11 @@ WebInspector.JavaScriptOutlineDialog = function(uiSourceCode, allFiles, selectIt
             uiSourceCodes = uiSourceCodes.concat(project.uiSourceCodes().filter(filterUiSourceCode, this));
         }
         WebInspector.workspace.projects().forEach(processProject, this);
+        uiSourceCodes.sort(sortUiSourceCode)
     }
     else
         uiSourceCodes = [ uiSourceCode ];
+
     this._processUiSourceCodes(uiSourceCodes);
 }
 
@@ -595,7 +600,7 @@ WebInspector.JavaScriptOutlineDialog.prototype = {
             if (index !== -1) {
                 file = file.substring(index+1);
             }
-            this._functionItems.push({chunk: chunk[i], uri: uri, file: file, uic: uic});
+            this._functionItems.push({chunk: chunk[i], uri: uri, file: file, uic: uic, uicscore: uiSourceCodes.length});
         }
 
         if (data.isLastChunk) {
@@ -633,8 +638,7 @@ WebInspector.JavaScriptOutlineDialog.prototype = {
      */
     itemScoreAt: function(itemIndex, query)
     {
-        var item = this._functionItems[itemIndex];
-        return -item.chunk.line;
+        return 0;
     },
 
     /**
@@ -649,7 +653,7 @@ WebInspector.JavaScriptOutlineDialog.prototype = {
         var item = this._functionItems[itemIndex];
         titleElement.textContent = item.chunk.name + (item.chunk.arguments ? item.chunk.arguments : "");
         this.highlightRanges(titleElement, query);
-        subtitleElement.textContent = (this._allFiles ? item.file : "") + ":" + (item.chunk.line + 1);
+        subtitleElement.textContent = (item.chunk.line + 1) + (this._allFiles ? (":" + item.file) : "");
         subtitleElement.title = item.uri;
     },
 
