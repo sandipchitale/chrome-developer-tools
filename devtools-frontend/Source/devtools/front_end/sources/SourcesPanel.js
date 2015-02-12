@@ -1097,44 +1097,40 @@ WebInspector.SourcesPanel.prototype = {
      */
     _showConstructorDefinitionOrDocumentation: function(definition, remoteObject)
     {
-        var that = this;
         function processOwnProperties(properties) {
             function processIfProto(property) {
                 function processProtoOwnProperties(properties) {
                     function processIfConstructor(property) {
-                        if ("constructor" === property.name) {
+                        if (property.name === "constructor" && property.value && property.value.type === "function")
                             if (definition) {
                                 var debuggerModel = remoteObject.target().debuggerModel;
-                                debuggerModel.functionDetails(property.value, that._didGetFunctionOrGeneratorObjectDetails.bind(that));
+                                debuggerModel.functionDetails(property.value, this._didGetFunctionOrGeneratorObjectDetails.bind(this));
                             } else
-                                that._showFunctionDocumentation(property.value);
-                        }
+                                this._showFunctionDocumentation(property.value);
                     }
                     if (properties)
-                        properties.forEach(processIfConstructor);
+                        properties.forEach(processIfConstructor.bind(this));
                 }
                 if ("__proto__" === property.name)
-                    property.value.getOwnProperties(processProtoOwnProperties);
+                    property.value.getOwnProperties(processProtoOwnProperties.bind(this));
             }
             if (properties)
-                properties.forEach(processIfProto);
+                properties.forEach(processIfProto.bind(this));
         }
-        remoteObject.getOwnProperties(processOwnProperties);
+        remoteObject.getOwnProperties(processOwnProperties.bind(this));
     },
 
     /**
      * @param {!WebInspector.RemoteObject} functionObject
      */
     _showFunctionDocumentation: function(functionObject) {
-        if (functionObject) {
-            var description = functionObject.description;
-            if (description) {
-                var matches = /function (.+)\(.*/.exec(description);
-                if (matches && matches[1]) {
-                    this._showApi(matches[1]);
-                }
-            }
+        var debuggerModel = functionObject.target().debuggerModel;
+        function didGetFunctionDetails(response) {
+            if (!response || !response.functionName)
+                return;
+            this._showApi(response.functionName);
         }
+        debuggerModel.functionDetails(functionObject, didGetFunctionDetails.bind(this));
     },
 
     /**
@@ -1250,7 +1246,8 @@ WebInspector.SourcesPanel.prototype = {
         this.sidebarPanes.jsBreakpoints.expand();
         this.sidebarPanes.callstack.expand();
         this._sidebarPaneStack = sidebarPaneStack;
-        this._updateTargetsSidebarVisibility();
+        this._sidebarPaneStack.togglePaneHidden(this.sidebarPanes.threads, true);
+        this._showThreadsSidebarPaneIfNeeded();
         if (WebInspector.settings.watchExpressions.get().length > 0)
             this.sidebarPanes.watchExpressions.expand();
     },
@@ -1289,7 +1286,7 @@ WebInspector.SourcesPanel.prototype = {
      */
     targetAdded: function(target)
     {
-        this._updateTargetsSidebarVisibility();
+        this._showThreadsSidebarPaneIfNeeded();
     },
 
     /**
@@ -1298,15 +1295,16 @@ WebInspector.SourcesPanel.prototype = {
      */
     targetRemoved: function(target)
     {
-        this._updateTargetsSidebarVisibility();
+        this._showThreadsSidebarPaneIfNeeded();
     },
 
-    _updateTargetsSidebarVisibility: function()
+    _showThreadsSidebarPaneIfNeeded: function()
     {
-        if (!this._sidebarPaneStack)
-            return;
         // FIXME(413886): We could remove worker frontend check here once we support explicit threads and do not send main thread for service/shared workers to frontend.
-        this._sidebarPaneStack.togglePaneHidden(this.sidebarPanes.threads, WebInspector.targetManager.targets().length < 2 || WebInspector.isWorkerFrontend());
+        if (!this._sidebarPaneStack || WebInspector.isWorkerFrontend() || WebInspector.targetManager.targets().length < 2)
+            return;
+
+        this._sidebarPaneStack.togglePaneHidden(this.sidebarPanes.threads, false);
     },
 
     __proto__: WebInspector.Panel.prototype
