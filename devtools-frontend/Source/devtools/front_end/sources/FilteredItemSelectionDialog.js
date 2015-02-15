@@ -529,15 +529,34 @@ WebInspector.SelectionDialogContentProvider.prototype = {
  * @param {!WebInspector.UISourceCode} uiSourceCode
  * @param {function(number, number)} selectItemCallback
  */
-WebInspector.JavaScriptOutlineDialog = function(uiSourceCode, selectItemCallback)
+WebInspector.JavaScriptOutlineDialog = function(uiSourceCode, allFiles, selectItemCallback)
 {
     WebInspector.SelectionDialogContentProvider.call(this);
 
     this._functionItems = [];
+    this._allFiles = allFiles;
     this._selectItemCallback = selectItemCallback;
-    this._outlineWorker = new WorkerRuntime.Worker("script_formatter_worker");
-    this._outlineWorker.onmessage = this._didBuildOutlineChunk.bind(this);
-    this._outlineWorker.postMessage({ method: "javaScriptOutline", params: { content: uiSourceCode.workingCopy() } });
+    var uiSourceCodes;
+    if (allFiles) {
+        uiSourceCodes = [];
+        function sortUiSourceCode(a, b) {
+            return b.name().localeCompare(a.name());
+        }
+        function filterUiSourceCode(uic) {
+            if (/^VM[0-9]+.*/.test(uic.name()))
+                return false;
+            return (uic.contentType() === WebInspector.resourceTypes.Document || uic.contentType() === WebInspector.resourceTypes.Script);
+        };
+        function processProject(project) {
+            uiSourceCodes = uiSourceCodes.concat(project.uiSourceCodes().filter(filterUiSourceCode, this));
+        }
+        WebInspector.workspace.projects().forEach(processProject, this);
+        uiSourceCodes.sort(sortUiSourceCode)
+    }
+    else
+        uiSourceCodes = [ uiSourceCode ];
+
+    this._processUiSourceCodes(uiSourceCodes);
 }
 
 /**
@@ -545,29 +564,50 @@ WebInspector.JavaScriptOutlineDialog = function(uiSourceCode, selectItemCallback
  * @param {!WebInspector.UISourceCode} uiSourceCode
  * @param {function(number, number)} selectItemCallback
  */
-WebInspector.JavaScriptOutlineDialog.show = function(view, uiSourceCode, selectItemCallback)
+WebInspector.JavaScriptOutlineDialog.show = function(view, uiSourceCode, allFiles, selectItemCallback)
 {
     if (WebInspector.Dialog.currentInstance())
         return;
-    var filteredItemSelectionDialog = new WebInspector.FilteredItemSelectionDialog(new WebInspector.JavaScriptOutlineDialog(uiSourceCode, selectItemCallback));
+    var filteredItemSelectionDialog = new WebInspector.FilteredItemSelectionDialog(new WebInspector.JavaScriptOutlineDialog(uiSourceCode, allFiles, selectItemCallback));
     WebInspector.Dialog.show(view.element, filteredItemSelectionDialog);
 }
 
 WebInspector.JavaScriptOutlineDialog.prototype = {
+
+    _processUiSourceCodes: function(uiSourceCodes) {
+        var uic = uiSourceCodes.pop();
+        if (uic) {
+            this._outlineWorker = new WorkerRuntime.Worker("script_formatter_worker");
+            this._outlineWorker.onmessage = this._didBuildOutlineChunk.bind(this, uic, uiSourceCodes);
+            function postMessage() {
+                this._outlineWorker.postMessage({ method: "javaScriptOutline", params: { content: uic.workingCopy() } });
+            }
+            uic.requestContent(postMessage.bind(this));
+        }
+    },
+
     /**
      * @param {!MessageEvent} event
      */
-    _didBuildOutlineChunk: function(event)
+    _didBuildOutlineChunk: function(uic, uiSourceCodes, event)
     {
         var data = /** @type {!WebInspector.JavaScriptOutlineDialog.MessageEventData} */ (event.data);
         var chunk = data.chunk;
-        for (var i = 0; i < chunk.length; ++i)
-            this._functionItems.push(chunk[i]);
+        for (var i = 0; i < chunk.length; ++i) {
+            var uri = uic.uri();
+            var file = uri;
+            var index = file.lastIndexOf("/");
+            if (index !== -1) {
+                file = file.substring(index+1);
+            }
+            this._functionItems.push({chunk: chunk[i], uri: uri, file: file, uic: uic, uicscore: uiSourceCodes.length});
+        }
 
-        if (data.isLastChunk)
+        if (data.isLastChunk) {
             this.dispose();
-
-        this.refresh();
+            this.refresh();
+            this._processUiSourceCodes(uiSourceCodes);
+        }
     },
 
     /**
@@ -587,7 +627,7 @@ WebInspector.JavaScriptOutlineDialog.prototype = {
     itemKeyAt: function(itemIndex)
     {
         var item = this._functionItems[itemIndex];
-        return item.name + (item.arguments ? item.arguments : "");
+        return item.chunk.name + (item.chunk.arguments ? item.chunk.arguments : "");
     },
 
     /**
@@ -598,8 +638,7 @@ WebInspector.JavaScriptOutlineDialog.prototype = {
      */
     itemScoreAt: function(itemIndex, query)
     {
-        var item = this._functionItems[itemIndex];
-        return -item.line;
+        return 0;
     },
 
     /**
@@ -612,9 +651,10 @@ WebInspector.JavaScriptOutlineDialog.prototype = {
     renderItem: function(itemIndex, query, titleElement, subtitleElement)
     {
         var item = this._functionItems[itemIndex];
-        titleElement.textContent = item.name + (item.arguments ? item.arguments : "");
+        titleElement.textContent = item.chunk.name + (item.chunk.arguments ? item.chunk.arguments : "");
         this.highlightRanges(titleElement, query);
-        subtitleElement.textContent = ":" + (item.line + 1);
+        subtitleElement.textContent = (item.chunk.line + 1) + (this._allFiles ? (":" + item.file) : "");
+        subtitleElement.title = item.uri;
     },
 
     /**
@@ -626,9 +666,9 @@ WebInspector.JavaScriptOutlineDialog.prototype = {
     {
         if (itemIndex === null)
             return;
-        var lineNumber = this._functionItems[itemIndex].line;
+        var lineNumber = this._functionItems[itemIndex].chunk.line;
         if (!isNaN(lineNumber) && lineNumber >= 0)
-            this._selectItemCallback(lineNumber, this._functionItems[itemIndex].column);
+            this._selectItemCallback(this._functionItems[itemIndex].uic, lineNumber, this._functionItems[itemIndex].chunk.column);
     },
 
     dispose: function()
@@ -757,7 +797,7 @@ WebInspector.SelectUISourceCodeDialog.prototype = {
         subtitleElement.textContent = uiSourceCode.fullDisplayName().trimEnd(100);
 
         var indexes = [];
-        var score = new WebInspector.FilePathScoreFunction(query).score(subtitleElement.textContent, indexes);
+        var score = new WebInspector.FilePathScoreFunction(query).score(uiSourceCode.fullDisplayName(), indexes);
         var fileNameIndex = subtitleElement.textContent.lastIndexOf("/");
         var ranges = [];
         for (var i = 0; i < indexes.length; ++i)

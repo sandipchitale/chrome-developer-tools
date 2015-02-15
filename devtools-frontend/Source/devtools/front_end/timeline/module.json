@@ -16,7 +16,8 @@
         }
     ],
     "dependencies": [
-        "components"
+        "components",
+        "ui_lazy"
     ],
     "scripts": [
         "CountersGraph.js",
@@ -32,8 +33,6 @@
         "TimelineEventOverview.js",
         "TimelineFrameOverview.js",
         "TimelineMemoryOverview.js",
-        "TimelinePowerGraph.js",
-        "TimelinePowerOverview.js",
         "TimelineFlameChart.js",
         "TimelineUIUtils.js",
         "TimelineView.js",

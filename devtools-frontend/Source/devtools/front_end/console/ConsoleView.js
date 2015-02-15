@@ -112,6 +112,8 @@ WebInspector.ConsoleView = function()
     this._promptElement.id = "console-prompt";
     this._promptElement.spellcheck = false;
 
+    this._searchableView.setDefaultFocusedElement(this._promptElement);
+
     // FIXME: This is a workaround for the selection machinery bug. See crbug.com/410899
     var selectAllFixer = this._messagesElement.createChild("div", "console-view-fix-select-all");
     selectAllFixer.textContent = ".";
@@ -158,6 +160,14 @@ WebInspector.ConsoleView = function()
 }
 
 WebInspector.ConsoleView.prototype = {
+    /**
+     * @return {!WebInspector.SearchableView}
+     */
+    searchableView: function()
+    {
+        return this._searchableView;
+    },
+
     /**
      * @param {!WebInspector.Event} event
      */
@@ -642,6 +652,10 @@ WebInspector.ConsoleView.prototype = {
             return;
 
         var contextMenu = new WebInspector.ContextMenu(event);
+        if (event.target.isSelfOrDescendant(this._promptElement)) {
+            contextMenu.show()
+            return;
+        }
 
         function monitoringXHRItemAction()
         {
@@ -726,8 +740,12 @@ WebInspector.ConsoleView.prototype = {
                 return;
             }
             var lines = [];
-            for (var i = 0; i < chunkSize && i + messageIndex < this.itemCount(); ++i)
-                lines.push(this.itemElement(messageIndex + i).element().textContent);
+            for (var i = 0; i < chunkSize && i + messageIndex < this.itemCount(); ++i) {
+                var message = this.itemElement(messageIndex + i);
+                // Ensure DOM element for console message.
+                message.element();
+                lines.push(message.renderedText());
+            }
             messageIndex += i;
             stream.write(lines.join("\n") + "\n", writeNextChunk.bind(this));
             progressIndicator.setWorked(messageIndex);
@@ -898,7 +916,7 @@ WebInspector.ConsoleView.prototype = {
             if (!wasThrown)
                 message = new WebInspector.ConsoleMessage(target, WebInspector.ConsoleMessage.MessageSource.JS, level, "", WebInspector.ConsoleMessage.MessageType.Result, url, lineNumber, columnNumber, undefined, [result]);
             else
-                message = new WebInspector.ConsoleMessage(target, WebInspector.ConsoleMessage.MessageSource.JS, level, exceptionDetails.text, WebInspector.ConsoleMessage.MessageType.Result, exceptionDetails.url, exceptionDetails.line, exceptionDetails.column, undefined, [WebInspector.UIString("Uncaught"), result], exceptionDetails.stackTrace, undefined, undefined, undefined, undefined, exceptionDetails.scriptId);
+                message = new WebInspector.ConsoleMessage(target, WebInspector.ConsoleMessage.MessageSource.JS, level, exceptionDetails.text, WebInspector.ConsoleMessage.MessageType.Result, exceptionDetails.url, exceptionDetails.line, exceptionDetails.column, undefined, [WebInspector.UIString("Uncaught"), result], exceptionDetails.stackTrace, undefined, undefined, undefined, exceptionDetails.scriptId);
             message.setOriginatingMessage(originatingConsoleMessage);
             target.consoleModel.addMessage(message);
         }
@@ -986,10 +1004,10 @@ WebInspector.ConsoleView.prototype = {
      */
     performSearch: function(searchConfig, shouldJump, jumpBackwards)
     {
-        var query = searchConfig.query;
         this.searchCanceled();
         this._searchableView.updateSearchMatchesCount(0);
-        this._searchRegex = createPlainTextSearchRegex(query, "gi");
+
+        this._searchRegex = searchConfig.toSearchRegex(true);
 
         this._regexMatchRanges = [];
         this._currentMatchRangeIndex = -1;
@@ -1056,7 +1074,7 @@ WebInspector.ConsoleView.prototype = {
      */
     supportsCaseSensitiveSearch: function()
     {
-        return false;
+        return true;
     },
 
     /**
@@ -1065,7 +1083,7 @@ WebInspector.ConsoleView.prototype = {
      */
     supportsRegexSearch: function()
     {
-        return false;
+        return true;
     },
 
     _clearSearchResultHighlights: function()
@@ -1262,10 +1280,7 @@ WebInspector.ConsoleCommand = function(message, linkifier, nestingLevel)
 WebInspector.ConsoleCommand.prototype = {
     clearHighlights: function()
     {
-        var highlightedMessage = this._formattedCommand;
-        delete this._formattedCommand;
-        this._formatCommand();
-        this._element.replaceChild(this._formattedCommand, highlightedMessage);
+        WebInspector.removeSearchResultsHighlight(this._formattedCommand, WebInspector.highlightedSearchResultClassName);
     },
 
     /**
@@ -1289,16 +1304,14 @@ WebInspector.ConsoleCommand.prototype = {
             this._element = createElementWithClass("div", "console-user-command");
             this._element.message = this;
 
-            this._formatCommand();
+            this._formattedCommand = createElementWithClass("span", "console-message-text source-code");
+            this._formattedCommand.textContent = this.text;
             this._element.appendChild(this._formattedCommand);
+
+            var javascriptSyntaxHighlighter = new WebInspector.DOMSyntaxHighlighter("text/javascript", true);
+            javascriptSyntaxHighlighter.syntaxHighlightNode(this._formattedCommand);
         }
         return this._element;
-    },
-
-    _formatCommand: function()
-    {
-        this._formattedCommand = createElementWithClass("span", "console-message-text source-code");
-        this._formattedCommand.textContent = this.text;
     },
 
     /**

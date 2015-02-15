@@ -255,7 +255,7 @@ WebInspector.ConsoleViewMessage.prototype = {
     _formattedMessageText: function()
     {
         this.formattedMessage();
-        return this._messageElement.textContent;
+        return this._messageElement.deepTextContent();
     },
 
     /**
@@ -670,7 +670,7 @@ WebInspector.ConsoleViewMessage.prototype = {
      */
     useArrayPreviewInFormatter: function(array)
     {
-        return this._message.type !== WebInspector.ConsoleMessage.MessageType.DirXML && !!array.preview;
+        return this._message.type !== WebInspector.ConsoleMessage.MessageType.DirXML;
     },
 
     /**
@@ -679,14 +679,9 @@ WebInspector.ConsoleViewMessage.prototype = {
      */
     _formatParameterAsArray: function(array, elem)
     {
-        if (this.useArrayPreviewInFormatter(array)) {
-            this._formatParameterAsArrayOrObject(array, elem, true);
-            return;
-        }
-
         var maxFlatArrayLength = 100;
-        if (this._message.isOutdated || array.arrayLength() > maxFlatArrayLength)
-            this._formatParameterAsObject(array, elem, false);
+        if (this.useArrayPreviewInFormatter(array) || array.arrayLength() > maxFlatArrayLength)
+            this._formatParameterAsArrayOrObject(array, elem, this.useArrayPreviewInFormatter(array) || array.arrayLength() <= maxFlatArrayLength);
         else
             array.getAllProperties(false, this._printArray.bind(this, array, elem));
     },
@@ -998,19 +993,6 @@ WebInspector.ConsoleViewMessage.prototype = {
         WebInspector.removeSearchResultsHighlight(this._formattedMessage, WebInspector.highlightedSearchResultClassName);
     },
 
-    _highlightSearchResultsInElement: function(regexObject, element)
-    {
-        regexObject.lastIndex = 0;
-        var text = element.textContent;
-        var match = regexObject.exec(text);
-        var matchRanges = [];
-        while (match) {
-            matchRanges.push(new WebInspector.SourceRange(match.index, match[0].length));
-            match = regexObject.exec(text);
-        }
-        WebInspector.highlightSearchResults(element, matchRanges);
-    },
-
     /**
      * @return {boolean}
      */
@@ -1143,44 +1125,12 @@ WebInspector.ConsoleViewMessage.prototype = {
      */
     _populateStackTraceTreeElement: function(parentTreeElement)
     {
-        /**
-         * @param {!Array.<!ConsoleAgent.CallFrame>=} stackTrace
-         * @this {WebInspector.ConsoleViewMessage}
-         */
-        function appendStackTrace(stackTrace)
-        {
-            if (!stackTrace)
-                return;
-
-            for (var i = 0; i < stackTrace.length; i++) {
-                var frame = stackTrace[i];
-
-                var content = createElementWithClass("div", "stacktrace-entry");
-                var functionName = WebInspector.beautifyFunctionName(frame.functionName);
-                if (frame.scriptId) {
-                    var urlElement = this._linkifyCallFrame(frame);
-                    if (!urlElement)
-                        continue;
-                    content.appendChild(urlElement);
-                    content.createTextChild(" ");
-                }
-
-                content.createChild("span", "console-message-text source-code").textContent = functionName;
-                parentTreeElement.appendChild(new TreeElement(content));
-            }
-        }
-
-        appendStackTrace.call(this, this._message.stackTrace);
-
-        for (var asyncTrace = this._message.asyncStackTrace; asyncTrace; asyncTrace = asyncTrace.asyncStackTrace) {
-            if (!asyncTrace.callFrames || !asyncTrace.callFrames.length)
-                break;
-            var content = createElementWithClass("div", "stacktrace-entry");
-            var description = WebInspector.asyncStackTraceLabel(asyncTrace.description);
-            content.createChild("span", "console-message-text source-code console-async-trace-text").textContent = description;
-            parentTreeElement.appendChild(new TreeElement(content));
-            appendStackTrace.call(this, asyncTrace.callFrames);
-        }
+        var target = this._target();
+        if (!target)
+            return;
+        var content = WebInspector.DOMPresentationUtils.buildStackTracePreviewContents(target,
+            this._linkifier, this._message.stackTrace, this._message.asyncStackTrace);
+        parentTreeElement.appendChild(new TreeElement(content));
     },
 
     resetIncrementRepeatCount: function()
@@ -1321,7 +1271,7 @@ WebInspector.ConsoleViewMessage.prototype = {
     {
         if (!this._messageElement)
             return "";
-        return this._messageElement.textContent;
+        return this._messageElement.deepTextContent();
     },
 
     /**

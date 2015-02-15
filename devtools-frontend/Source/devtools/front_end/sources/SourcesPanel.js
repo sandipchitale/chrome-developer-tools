@@ -85,6 +85,8 @@ WebInspector.SourcesPanel = function(workspaceForTest)
     this.sidebarPanes.domBreakpoints = WebInspector.domBreakpointsSidebarPane.createProxy(this);
     this.sidebarPanes.xhrBreakpoints = new WebInspector.XHRBreakpointsSidebarPane();
     this.sidebarPanes.eventListenerBreakpoints = new WebInspector.EventListenerBreakpointsSidebarPane();
+    if (Runtime.experiments.isEnabled("stepIntoAsync"))
+        this.sidebarPanes.asyncOperationBreakpoints = new WebInspector.AsyncOperationsSidebarPane();
 
     this._extensionSidebarPanes = [];
     this._installDebuggerSidebarController();
@@ -965,8 +967,14 @@ WebInspector.SourcesPanel.prototype = {
             contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^function ^definition"), this._showFunctionDefinition.bind(this, remoteObject));
         if (remoteObject.subtype === "generator")
             contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^generator ^location"), this._showGeneratorLocation.bind(this, remoteObject));
-        if (remoteObject.type === "object" && "array" !== remoteObject.subtype)
-            contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^class ^definition"), this._showClassDefinition.bind(this, remoteObject));
+        if (remoteObject.type === "object")
+            contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^constructor ^definition"), this._showConstructorDefinitionOrDocumentation.bind(this, true, remoteObject));
+        if (Runtime.experiments.isEnabled("showFunctionDocumentation")) {
+            if (remoteObject.type === "function")
+                contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^function ^documentation"), this._showFunctionDocumentation.bind(this, remoteObject));
+            if (remoteObject.type === "object")
+                contextMenu.appendItem(WebInspector.UIString.capitalize("Show ^constructor ^documentation"), this._showConstructorDefinitionOrDocumentation.bind(this, false, remoteObject));
+        }
     },
 
     /**
@@ -1056,7 +1064,7 @@ WebInspector.SourcesPanel.prototype = {
     _showFunctionDefinition: function(remoteObject)
     {
         var debuggerModel = remoteObject.target().debuggerModel;
-        debuggerModel.functionDetails(remoteObject, this._didGetFunctionOrGeneratorObjectDetails.bind(this, remoteObject));
+        debuggerModel.functionDetails(remoteObject, this._didGetFunctionOrGeneratorObjectDetails.bind(this));
     },
 
     /**
@@ -1065,90 +1073,99 @@ WebInspector.SourcesPanel.prototype = {
     _showGeneratorLocation: function(remoteObject)
     {
         var debuggerModel = remoteObject.target().debuggerModel;
-        debuggerModel.generatorObjectDetails(remoteObject, this._didGetFunctionOrGeneratorObjectDetails.bind(this, remoteObject));
+        debuggerModel.generatorObjectDetails(remoteObject, this._didGetFunctionOrGeneratorObjectDetails.bind(this));
     },
 
     /**
+     * @param {?{location: ?WebInspector.DebuggerModel.Location}} response
+     */
+    _didGetFunctionOrGeneratorObjectDetails: function(response)
+    {
+        if (!response || !response.location)
+            return;
+
+        var location = response.location;
+        if (!location)
+            return;
+
+        var uiLocation = WebInspector.debuggerWorkspaceBinding.rawLocationToUILocation(location);
+        if (uiLocation)
+            this.showUILocation(uiLocation, true);
+    },
+
+    /**
+     * @param {boolean=} definition
      * @param {!WebInspector.RemoteObject} remoteObject
      */
-    _showClassDefinition: function(remoteObject)
+    _showConstructorDefinitionOrDocumentation: function(definition, remoteObject)
     {
-        var that = this;
-        remoteObject.getOwnProperties(function(properties){
-            if (properties) {
-                properties.forEach(function(property) {
-                    if ("__proto__" === property.name) {
-                        property.value.getOwnProperties(function(properties){
-                            if (properties) {
-                                properties.forEach(function(property) {
-                                    if ("constructor" === property.name) {
-                                        var debuggerModel = remoteObject.target().debuggerModel;
-                                        debuggerModel.functionDetails(property.value,
-                                                that._didGetFunctionOrGeneratorObjectDetails.bind(that, property.value));
-                                    }
-                                });
-                            }
-                        });
+        function processOwnProperties(properties) {
+            function processIfProto(property) {
+                function processProtoOwnProperties(properties) {
+                    function processIfConstructor(property) {
+                        if (property.name === "constructor" && property.value && property.value.type === "function")
+                            if (definition) {
+                                var debuggerModel = remoteObject.target().debuggerModel;
+                                debuggerModel.functionDetails(property.value, this._didGetFunctionOrGeneratorObjectDetails.bind(this));
+                            } else
+                                this._showFunctionDocumentation(property.value);
                     }
-                });
+                    if (properties)
+                        properties.forEach(processIfConstructor.bind(this));
+                }
+                if ("__proto__" === property.name)
+                    property.value.getOwnProperties(processProtoOwnProperties.bind(this));
             }
-        });
+            if (properties)
+                properties.forEach(processIfProto.bind(this));
+        }
+        remoteObject.getOwnProperties(processOwnProperties.bind(this));
     },
 
     /**
      * @param {!WebInspector.RemoteObject} functionObject
-     * @param {?{location: ?WebInspector.DebuggerModel.Location}} response
      */
-    _didGetFunctionOrGeneratorObjectDetails: function(functionObject, response)
-    {
-        if (response && response.location) {
-            var location = response.location;
-            if (location) {
-                var uiLocation = WebInspector.debuggerWorkspaceBinding.rawLocationToUILocation(location);
-                if (uiLocation) {
-                    this.showUILocation(uiLocation, true);
-                    return;
-                }
-            }
+    _showFunctionDocumentation: function(functionObject) {
+        var debuggerModel = functionObject.target().debuggerModel;
+        function didGetFunctionDetails(response) {
+            if (!response || !response.functionName)
+                return;
+            this._showApi(response.functionName);
         }
-        if (functionObject) {
-            var description = functionObject.description;
-            if (description) {
-                var matches = /function (.+)\(.*/.exec(description);
-                if (matches && matches[1]) {
-                    this._showApi(matches[1]);
-                }
-            }
-        }
+        debuggerModel.functionDetails(functionObject, didGetFunctionDetails.bind(this));
     },
 
+    /**
+     * @param {string} api
+     */
     _showApi: function(api)
     {
+        var urlPrefixes =  window.localStorage["experiments.showFunctionDocumentation"];
+        if (!urlPrefixes)
+            return;
+
+        urlPrefixes = urlPrefixes.split("\n");
+
+        const apiToken = "{api}";
         var xhr = new XMLHttpRequest();
 
-        var urlPrefixes = [
-            "https://developer.mozilla.org/en-US/docs/Web/API/",
-            "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/",
-            "https://developer.mozilla.org/de/docs/DOM/window.",
-            null
-        ];
-
         function showPage(i) {
-            xhr.open("HEAD", urlPrefixes[i] + api, true);
+            var url = urlPrefixes[i];
+            if (!url)
+                return;
+            url = url.replace(apiToken, api);
+            xhr.open("HEAD", url, true);
             xhr.onreadystatechange = function()
             {
                 if (xhr.readyState !== XMLHttpRequest.DONE)
                     return;
                 xhr.onreadystatechange = null;
                 if (xhr.status !== 200) {
-                    if (urlPrefixes[i+1]) {
-                        xhr.onreadystatechange = null;
-                        showPage(i+1);
-                    }
+                    showPage(i+1);
                     return;
                 }
                 xhr.onreadystatechange = null;
-                InspectorFrontendHost.openInNewTab(urlPrefixes[i] + api);
+                InspectorFrontendHost.openInNewTab(url);
             }
             xhr.send(null);
         }
@@ -1211,6 +1228,8 @@ WebInspector.SourcesPanel.prototype = {
             sidebarPaneStack.addPane(this.sidebarPanes.domBreakpoints);
             sidebarPaneStack.addPane(this.sidebarPanes.xhrBreakpoints);
             sidebarPaneStack.addPane(this.sidebarPanes.eventListenerBreakpoints);
+            if (Runtime.experiments.isEnabled("stepIntoAsync"))
+                sidebarPaneStack.addPane(this.sidebarPanes.asyncOperationBreakpoints);
 
             var tabbedPane = new WebInspector.SidebarTabbedPane();
             splitView.setSidebarView(tabbedPane);
@@ -1231,7 +1250,8 @@ WebInspector.SourcesPanel.prototype = {
         this.sidebarPanes.jsBreakpoints.expand();
         this.sidebarPanes.callstack.expand();
         this._sidebarPaneStack = sidebarPaneStack;
-        this._updateTargetsSidebarVisibility();
+        this._sidebarPaneStack.togglePaneHidden(this.sidebarPanes.threads, true);
+        this._showThreadsSidebarPaneIfNeeded();
         if (WebInspector.settings.watchExpressions.get().length > 0)
             this.sidebarPanes.watchExpressions.expand();
     },
@@ -1270,7 +1290,7 @@ WebInspector.SourcesPanel.prototype = {
      */
     targetAdded: function(target)
     {
-        this._updateTargetsSidebarVisibility();
+        this._showThreadsSidebarPaneIfNeeded();
     },
 
     /**
@@ -1279,15 +1299,16 @@ WebInspector.SourcesPanel.prototype = {
      */
     targetRemoved: function(target)
     {
-        this._updateTargetsSidebarVisibility();
+        this._showThreadsSidebarPaneIfNeeded();
     },
 
-    _updateTargetsSidebarVisibility: function()
+    _showThreadsSidebarPaneIfNeeded: function()
     {
-        if (!this._sidebarPaneStack)
-            return;
         // FIXME(413886): We could remove worker frontend check here once we support explicit threads and do not send main thread for service/shared workers to frontend.
-        this._sidebarPaneStack.togglePaneHidden(this.sidebarPanes.threads, WebInspector.targetManager.targets().length < 2 || WebInspector.isWorkerFrontend());
+        if (!this._sidebarPaneStack || WebInspector.isWorkerFrontend() || WebInspector.targetManager.targets().length < 2)
+            return;
+
+        this._sidebarPaneStack.togglePaneHidden(this.sidebarPanes.threads, false);
     },
 
     __proto__: WebInspector.Panel.prototype

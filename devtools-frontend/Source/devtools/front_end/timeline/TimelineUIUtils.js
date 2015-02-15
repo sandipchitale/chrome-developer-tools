@@ -215,13 +215,11 @@ WebInspector.TimelineUIUtils.isMarkerEvent = function(event)
 /**
  * @param {!WebInspector.TracingModel.Event} event
  * @param {?WebInspector.Target} target
- * @param {!WebInspector.Linkifier} linkifier
- * @return {?Node}
+ * @return {?string}
  */
-WebInspector.TimelineUIUtils.buildDetailsNodeForTraceEvent = function(event, target, linkifier)
+WebInspector.TimelineUIUtils.buildDetailsTextForTraceEvent = function(event, target)
 {
     var recordType = WebInspector.TimelineModel.RecordType;
-    var details;
     var detailsText;
     var eventData = event.args["data"];
     switch (event.name) {
@@ -233,13 +231,10 @@ WebInspector.TimelineUIUtils.buildDetailsNodeForTraceEvent = function(event, tar
         detailsText = eventData["timerId"];
         break;
     case recordType.FunctionCall:
-        details = linkifyLocation(eventData["scriptId"], eventData["scriptName"], eventData["scriptLine"], 0);
+        detailsText = linkifyLocationAsText(eventData["scriptId"], eventData["scriptLine"], 0);
         break;
     case recordType.JSFrame:
-        details = linkifyLocation(eventData["scriptId"], eventData["url"], eventData["lineNumber"], eventData["columnNumber"]);
         detailsText = WebInspector.beautifyFunctionName(eventData["functionName"]);
-        if (details && detailsText)
-            details.textContent = detailsText;
         break;
     case recordType.FireAnimationFrame:
         detailsText = eventData["id"];
@@ -255,22 +250,20 @@ WebInspector.TimelineUIUtils.buildDetailsNodeForTraceEvent = function(event, tar
         break;
     case recordType.TimerInstall:
     case recordType.TimerRemove:
-        details = linkifyTopCallFrame();
-        detailsText = eventData["timerId"];
+        detailsText = linkifyTopCallFrameAsText() || eventData["timerId"];
         break;
     case recordType.RequestAnimationFrame:
     case recordType.CancelAnimationFrame:
-        details = linkifyTopCallFrame();
-        detailsText = eventData["id"];
+        detailsText = linkifyTopCallFrameAsText() || eventData["id"];
         break;
     case recordType.ParseHTML:
     case recordType.RecalculateStyles:
-        details = linkifyTopCallFrame();
+        detailsText = linkifyTopCallFrameAsText();
         break;
     case recordType.EvaluateScript:
         var url = eventData["url"];
         if (url)
-            details = linkifyLocation("", url, eventData["lineNumber"], 0);
+            detailsText = url + ":" + eventData["lineNumber"];
         break;
     case recordType.XHRReadyStateChange:
     case recordType.XHRLoad:
@@ -306,6 +299,113 @@ WebInspector.TimelineUIUtils.buildDetailsNodeForTraceEvent = function(event, tar
         detailsText = eventData && eventData["name"];
         break;
 
+    default:
+        if (event.category === WebInspector.TracingModel.ConsoleEventCategory)
+            detailsText = null;
+        else
+            detailsText = linkifyTopCallFrameAsText();
+        break;
+    }
+
+    return detailsText;
+
+    /**
+     * @param {string} scriptId
+     * @param {number} lineNumber
+     * @param {number=} columnNumber
+     * @return {?string}
+     */
+    function linkifyLocationAsText(scriptId, lineNumber, columnNumber)
+    {
+        // FIXME(62725): stack trace line/column numbers are one-based.
+        var rawLocation = target && !target.isDetached() && scriptId ? target.debuggerModel.createRawLocationByScriptId(scriptId, lineNumber - 1, (columnNumber || 1) - 1) : null;
+        if (!rawLocation)
+            return null;
+        var uiLocation = WebInspector.debuggerWorkspaceBinding.rawLocationToUILocation(rawLocation);
+        return uiLocation.toUIString();
+    }
+
+    /**
+     * @return {?string}
+     */
+    function linkifyTopCallFrameAsText()
+    {
+        var stackTrace = event.stackTrace;
+        if (!stackTrace) {
+            var initiator = event.initiator;
+            if (initiator)
+                stackTrace = initiator.stackTrace;
+        }
+        if (!stackTrace || !stackTrace.length)
+            return null;
+        var callFrame = stackTrace[0];
+        return linkifyLocationAsText(callFrame.scriptId, callFrame.lineNumber, callFrame.columnNumber);
+    }
+}
+
+/**
+ * @param {!WebInspector.TracingModel.Event} event
+ * @param {?WebInspector.Target} target
+ * @param {!WebInspector.Linkifier} linkifier
+ * @return {?Node}
+ */
+WebInspector.TimelineUIUtils.buildDetailsNodeForTraceEvent = function(event, target, linkifier)
+{
+    var recordType = WebInspector.TimelineModel.RecordType;
+    var details;
+    var detailsText;
+    var eventData = event.args["data"];
+    switch (event.name) {
+    case recordType.GCEvent:
+    case recordType.TimerFire:
+    case recordType.FireAnimationFrame:
+    case recordType.EventDispatch:
+    case recordType.Paint:
+    case recordType.PaintImage:
+    case recordType.DecodeImage:
+    case recordType.ResizeImage:
+    case recordType.DecodeLazyPixelRef:
+    case recordType.Animation:
+    case recordType.XHRReadyStateChange:
+    case recordType.XHRLoad:
+    case recordType.ResourceSendRequest:
+    case recordType.ResourceReceivedData:
+    case recordType.ResourceReceiveResponse:
+    case recordType.ResourceFinish:
+    case recordType.EmbedderCallback:
+        detailsText = WebInspector.TimelineUIUtils.buildDetailsTextForTraceEvent(event, target);
+        break;
+    case recordType.FunctionCall:
+        details = linkifyLocation(eventData["scriptId"], eventData["scriptName"], eventData["scriptLine"], 0);
+        break;
+    case recordType.JSFrame:
+        details = createElement("span");
+        details.createTextChild(WebInspector.beautifyFunctionName(eventData["functionName"]));
+        var location = linkifyLocation(eventData["scriptId"], eventData["url"], eventData["lineNumber"], eventData["columnNumber"]);
+        if (location) {
+           details.createTextChild(" @ ");
+           details.appendChild(location);
+        }
+        break;
+    case recordType.TimerInstall:
+    case recordType.TimerRemove:
+        details = linkifyTopCallFrame();
+        detailsText = eventData["timerId"];
+        break;
+    case recordType.RequestAnimationFrame:
+    case recordType.CancelAnimationFrame:
+        details = linkifyTopCallFrame();
+        detailsText = eventData["id"];
+        break;
+    case recordType.ParseHTML:
+    case recordType.RecalculateStyles:
+        details = linkifyTopCallFrame();
+        break;
+    case recordType.EvaluateScript:
+        var url = eventData["url"];
+        if (url)
+            details = linkifyLocation("", url, eventData["lineNumber"], 0);
+        break;
     default:
         if (event.category === WebInspector.TracingModel.ConsoleEventCategory)
             detailsText = null;
@@ -719,6 +819,9 @@ WebInspector.TimelineUIUtils._generateInvalidationsForType = function(type, targ
      */
     function appendInvalidationGroup(parentElement, invalidations)
     {
+        if (!target)
+            return;
+
         var row = parentElement.createChild("div", "invalidations-group section");
         var header = row.createChild("div", "header");
         header.addEventListener("click", function() {
@@ -736,10 +839,13 @@ WebInspector.TimelineUIUtils._generateInvalidationsForType = function(type, targ
 
         appendTruncatedNodeList(header, invalidations);
 
-        if (topFrame) {
+        if (topFrame && contentHelper.linkifier()) {
             header.createTextChild(WebInspector.UIString(". "));
             var stack = header.createChild("span", "monospace");
-            contentHelper.appendStackFrame(stack, topFrame);
+
+            stack.createChild("span").textContent = WebInspector.beautifyFunctionName(topFrame.functionName);
+            stack.createChild("span").textContent = " @ ";
+            stack.createChild("span").appendChild(contentHelper.linkifier().linkifyConsoleCallFrame(target, topFrame));
         }
     }
 
@@ -1490,6 +1596,14 @@ WebInspector.TimelineDetailsContentHelper = function(target, linkifier, monospac
 
 WebInspector.TimelineDetailsContentHelper.prototype = {
     /**
+     * @return {?WebInspector.Linkifier}
+     */
+    linkifier: function()
+    {
+        return this._linkifier;
+    },
+
+    /**
      * @param {string} title
      * @param {string|number|boolean} value
      */
@@ -1547,22 +1661,14 @@ WebInspector.TimelineDetailsContentHelper.prototype = {
      */
     createChildStackTraceElement: function(parentElement, stackTrace)
     {
-        var stackTraceElement = parentElement.createChild("div", "timeline-details-view-row-value timeline-details-view-row-stack-trace monospace");
-        for (var i = 0; i < stackTrace.length; ++i) {
-            var row = stackTraceElement.createChild("div");
-            this.appendStackFrame(row, stackTrace[i]);
-        }
-    },
+        if (!this._linkifier || !this._target)
+            return;
 
-    /**
-     * @param {!Element} parentElement
-     * @param {!ConsoleAgent.CallFrame} stackFrame
-     */
-    appendStackFrame: function(parentElement, stackFrame)
-    {
-        parentElement.createTextChild(WebInspector.beautifyFunctionName(stackFrame.functionName));
-        parentElement.createTextChild(" @ ");
-        var urlElement = this._linkifier.linkifyScriptLocation(this._target, stackFrame.scriptId, stackFrame.url, stackFrame.lineNumber - 1, stackFrame.columnNumber - 1);
-        parentElement.appendChild(urlElement);
+        var stackTraceElement = parentElement.createChild("div", "timeline-details-view-row-value timeline-details-view-row-stack-trace monospace");
+
+        var callFrameElem = WebInspector.DOMPresentationUtils.buildStackTracePreviewContents(this._target, this._linkifier, stackTrace);
+
+        stackTraceElement.appendChild(callFrameElem);
     }
+
 }
