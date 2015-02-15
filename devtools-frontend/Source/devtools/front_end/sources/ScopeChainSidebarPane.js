@@ -66,6 +66,9 @@ WebInspector.ScopeChainSidebarPane.prototype = {
 
         this._sections = [];
 
+        if (this.memento)
+            this.memento.forgetProperties();
+        
         var foundLocalScope = false;
         var scopeChain = callFrame.scopeChain;
         for (var i = 0; i < scopeChain.length; ++i) {

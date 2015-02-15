@@ -99,9 +99,6 @@ WebInspector.ObjectPropertiesSection.prototype = {
 
     updateProperties: function(properties, internalProperties, rootTreeElementConstructor, rootPropertyComparer)
     {
-        if (this.memento)
-            this.memento.forgetProperties();
-
         if (!rootTreeElementConstructor)
             rootTreeElementConstructor = this.treeElementConstructor;
 

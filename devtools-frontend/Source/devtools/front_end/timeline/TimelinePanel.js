@@ -34,7 +34,6 @@
  * @extends {WebInspector.Panel}
  * @implements {WebInspector.TimelineModeViewDelegate}
  * @implements {WebInspector.Searchable}
- * @implements {WebInspector.TargetManager.Observer}
  */
 WebInspector.TimelinePanel = function()
 {
@@ -46,12 +45,11 @@ WebInspector.TimelinePanel = function()
     this._detailsLinkifier = new WebInspector.Linkifier();
     this._windowStartTime = 0;
     this._windowEndTime = Infinity;
+    this._millisecondsToRecordAfterLoadEvent = 3000;
+
+    this._tracingManager = new WebInspector.TracingManager();
 
     // Create model.
-    this._tracingManager = new WebInspector.TracingManager();
-    this._tracingManager.addEventListener(WebInspector.TracingManager.Events.BufferUsage, this._onTracingBufferUsage, this);
-    this._tracingManager.addEventListener(WebInspector.TracingManager.Events.RetrieveEventsProgress, this._onRetrieveEventsProgress, this);
-
     this._tracingModel = new WebInspector.TracingModel();
     this._model = new WebInspector.TimelineModel(this._tracingManager, this._tracingModel, WebInspector.TimelineUIUtils.hiddenRecordsFilter());
 
@@ -59,6 +57,8 @@ WebInspector.TimelinePanel = function()
     this._model.addEventListener(WebInspector.TimelineModel.Events.RecordingStopped, this._onRecordingStopped, this);
     this._model.addEventListener(WebInspector.TimelineModel.Events.RecordsCleared, this._onRecordsCleared, this);
     this._model.addEventListener(WebInspector.TimelineModel.Events.RecordFilterChanged, this._refreshViews, this);
+    this._model.addEventListener(WebInspector.TimelineModel.Events.BufferUsage, this._onTracingBufferUsage, this);
+    this._model.addEventListener(WebInspector.TimelineModel.Events.RetrieveEventsProgress, this._onRetrieveEventsProgress, this);
 
     this._categoryFilter = new WebInspector.TimelineCategoryFilter();
     this._durationFilter = new WebInspector.TimelineIsLongFilter();
@@ -112,7 +112,6 @@ WebInspector.TimelinePanel = function()
     this._onModeChanged();
     this._detailsSplitView.show(this.element);
     WebInspector.targetManager.addEventListener(WebInspector.TargetManager.Events.SuspendStateChanged, this._onSuspendStateChanged, this);
-    WebInspector.targetManager.observeTargets(this);
 }
 
 WebInspector.TimelinePanel.OverviewMode = {
@@ -133,30 +132,11 @@ WebInspector.TimelinePanel.DetailsTab = {
 WebInspector.TimelinePanel.rowHeight = 18;
 WebInspector.TimelinePanel.headerHeight = 20;
 
+WebInspector.TimelinePanel._aggregatedStatsKey = Symbol("aggregatedStats");
+
 WebInspector.TimelinePanel.durationFilterPresetsMs = [0, 1, 15];
 
 WebInspector.TimelinePanel.prototype = {
-    /**
-     * @override
-     * @param {!WebInspector.Target} target
-     */
-    targetAdded: function(target)
-    {
-        if (target !== WebInspector.targetManager.mainTarget() || !this._capturePowerCheckbox)
-            return;
-
-        this._capturePowerCheckbox.setVisible(target.hasCapability(WebInspector.Target.Capabilities.CanProfilePower));
-        this._onModeChanged();
-    },
-
-    /**
-     * @override
-     * @param {!WebInspector.Target} target
-     */
-    targetRemoved: function(target)
-    {
-    },
-
     /**
      * @override
      * @return {?WebInspector.SearchableView}
@@ -354,13 +334,6 @@ WebInspector.TimelinePanel.prototype = {
                                                                       this._captureMemorySetting,
                                                                       WebInspector.UIString("Capture memory information on every timeline event")));
         this._captureMemorySetting.addChangeListener(this._onModeChanged, this);
-        if (Runtime.experiments.isEnabled("timelinePowerProfiler")) {
-            this._capturePowerSetting = WebInspector.settings.createSetting("timelineCapturePower", false);
-            this._capturePowerSetting.addChangeListener(this._onModeChanged, this);
-            this._capturePowerCheckbox = this._createSettingCheckbox(WebInspector.UIString("Power"), this._capturePowerSetting, WebInspector.UIString("Capture power information"));
-            this._capturePowerCheckbox.setVisible(false);
-            this._panelToolbar.appendStatusBarItem(this._capturePowerCheckbox);
-        }
         this._captureLayersAndPicturesSetting = WebInspector.settings.createSetting("timelineCaptureLayersAndPictures", false);
         this._panelToolbar.appendStatusBarItem(this._createSettingCheckbox(WebInspector.UIString("Paint"),
                                                                       this._captureLayersAndPicturesSetting,
@@ -607,13 +580,6 @@ WebInspector.TimelinePanel.prototype = {
         }
 
         var mainTarget = WebInspector.targetManager.mainTarget();
-        if (this._capturePowerSetting && this._capturePowerSetting.get() && mainTarget &&
-            mainTarget.hasCapability(WebInspector.Target.Capabilities.CanProfilePower)) {
-            if (!isFrameMode)  // Frame mode skews time, don't render aux overviews.
-                this._overviewControls.push(new WebInspector.TimelinePowerOverview(this._model));
-            this._addModeView(new WebInspector.TimelinePowerGraph(this, this._model));
-        }
-
         if (this._lazyTimelineView)
             this._lazyTimelineView.setFrameModel(isFrameMode ? this._frameModel() : null);
 
@@ -644,7 +610,7 @@ WebInspector.TimelinePanel.prototype = {
      */
     _startRecording: function(userInitiated)
     {
-        this._userInitiatedRecording = userInitiated;
+        this._autoRecordGeneration = userInitiated ? null : {};
         var enableJSSampling = this._enableJSSamplingSettingSetting && this._enableJSSamplingSettingSetting.get();
         this._model.startRecording(this._captureCausesSetting.get(), enableJSSampling, this._captureMemorySetting.get(), this._captureLayersAndPicturesSetting && this._captureLayersAndPicturesSetting.get());
         if (this._lazyFrameModel)
@@ -662,7 +628,7 @@ WebInspector.TimelinePanel.prototype = {
     {
         this._stopPending = true;
         this._updateToggleTimelineButton(false);
-        this._userInitiatedRecording = false;
+        this._autoRecordGeneration = null;
         this._model.stopRecording();
         if (this._progressElement)
             this._updateProgress(WebInspector.UIString("Retrieving events\u2026"));
@@ -819,7 +785,7 @@ WebInspector.TimelinePanel.prototype = {
      */
     _willReloadPage: function(event)
     {
-        if (this._operationInProgress || this._userInitiatedRecording || !this.isShowing())
+        if (this._operationInProgress || this._recordingInProgress() || !this.isShowing())
             return;
         this._startRecording(false);
     },
@@ -829,9 +795,21 @@ WebInspector.TimelinePanel.prototype = {
      */
     _loadEventFired: function(event)
     {
-        if (!this._recordingInProgress() || this._userInitiatedRecording)
+        if (!this._recordingInProgress() || !this._autoRecordGeneration)
             return;
-        this._stopRecording();
+        setTimeout(stopRecordingOnReload.bind(this, this._autoRecordGeneration), this._millisecondsToRecordAfterLoadEvent);
+
+        /**
+         * @this {WebInspector.TimelinePanel}
+         * @param {!Object} recordGeneration
+         */
+        function stopRecordingOnReload(recordGeneration)
+        {
+            // Check if we're still in the same recording session.
+            if (this._autoRecordGeneration !== recordGeneration)
+                return;
+            this._stopRecording();
+        }
     },
 
     // WebInspector.Searchable implementation
@@ -1035,6 +1013,33 @@ WebInspector.TimelinePanel.prototype = {
     },
 
     /**
+     * @param {!WebInspector.TimelineModel.Record} record
+     * @param {number} startTime
+     * @param {number} endTime
+     * @param {!Object} aggregatedStats
+     */
+    _collectAggregatedStatsForRecord: function(record, startTime, endTime, aggregatedStats)
+    {
+        var records = [];
+
+        if (!record.endTime() || record.endTime() < startTime || record.startTime() > endTime)
+            return;
+
+        var childrenTime = 0;
+        var children = record.children() || [];
+        for (var i = 0; i < children.length; ++i) {
+            var child = children[i];
+            if (!child.endTime() || child.endTime() < startTime || child.startTime() > endTime)
+                continue;
+            childrenTime += Math.min(endTime, child.endTime()) - Math.max(startTime, child.startTime());
+            this._collectAggregatedStatsForRecord(child, startTime, endTime, aggregatedStats);
+        }
+        var categoryName = WebInspector.TimelineUIUtils.categoryForRecord(record).name;
+        var ownTime = Math.min(endTime, record.endTime()) - Math.max(startTime, record.startTime()) - childrenTime;
+        aggregatedStats[categoryName] = (aggregatedStats[categoryName] || 0) + ownTime;
+    },
+
+    /**
      * @param {number} startTime
      * @param {number} endTime
      */
@@ -1055,36 +1060,25 @@ WebInspector.TimelinePanel.prototype = {
         {
             return value < task.endTime() ? -1 : 1;
         }
-
-        /**
-         * @param {!WebInspector.TimelineModel.Record} record
-         */
-        function aggregateTimeForRecordWithinWindow(record)
-        {
-            if (!record.endTime() || record.endTime() < startTime || record.startTime() > endTime)
-                return;
-
-            var childrenTime = 0;
-            var children = record.children() || [];
-            for (var i = 0; i < children.length; ++i) {
-                var child = children[i];
-                if (!child.endTime() || child.endTime() < startTime || child.startTime() > endTime)
-                    continue;
-                childrenTime += Math.min(endTime, child.endTime()) - Math.max(startTime, child.startTime());
-                aggregateTimeForRecordWithinWindow(child);
-            }
-            var categoryName = WebInspector.TimelineUIUtils.categoryForRecord(record).name;
-            var ownTime = Math.min(endTime, record.endTime()) - Math.max(startTime, record.startTime()) - childrenTime;
-            aggregatedStats[categoryName] = (aggregatedStats[categoryName] || 0) + ownTime;
-        }
-
         var mainThreadTasks = this._model.mainThreadTasks();
         var taskIndex = insertionIndexForObjectInListSortedByFunction(startTime, mainThreadTasks, compareEndTime);
         for (; taskIndex < mainThreadTasks.length; ++taskIndex) {
             var task = mainThreadTasks[taskIndex];
             if (task.startTime() > endTime)
                 break;
-            aggregateTimeForRecordWithinWindow(task);
+            if (task.startTime() > startTime && task.endTime() < endTime) {
+                // cache stats for top-level entries that fit the range entirely.
+                var taskStats = task[WebInspector.TimelinePanel._aggregatedStatsKey];
+                if (!taskStats) {
+                    taskStats = {};
+                    this._collectAggregatedStatsForRecord(task, startTime, endTime, taskStats);
+                    task[WebInspector.TimelinePanel._aggregatedStatsKey] = taskStats;
+                }
+                for (var key in taskStats)
+                    aggregatedStats[key] = (aggregatedStats[key] || 0) + taskStats[key];
+                continue;
+            }
+            this._collectAggregatedStatsForRecord(task, startTime, endTime, aggregatedStats);
         }
 
         var aggregatedTotal = 0;
@@ -1100,14 +1094,6 @@ WebInspector.TimelinePanel.prototype = {
         contentHelper.appendTextRow(WebInspector.UIString("Range"), WebInspector.UIString("%s \u2013 %s", Number.millisToString(startOffset), Number.millisToString(endOffset)));
         contentHelper.appendElementRow(WebInspector.UIString("Aggregated Time"), pieChart);
 
-        for (var i = 0; i < this._overviewControls.length; ++i) {
-            if (this._overviewControls[i] instanceof WebInspector.TimelinePowerOverview) {
-                var energy = this._overviewControls[i].calculateEnergy(startTime, endTime);
-                contentHelper.appendTextRow(WebInspector.UIString("Energy"), WebInspector.UIString("%.2f Joules", energy));
-                contentHelper.appendTextRow(WebInspector.UIString("Accuracy"), WebInspector.powerProfiler.getAccuracyLevel());
-                break;
-            }
-        }
         this.showInDetails(contentHelper.element);
     },
 

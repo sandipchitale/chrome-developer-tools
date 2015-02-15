@@ -40,29 +40,22 @@ WebInspector.TimelineFlameChartDataProvider = function(model, frameModel)
     this.reset();
     this._model = model;
     this._frameModel = frameModel;
-    this._font = "12px " + WebInspector.fontFamily();
-    this._linkifier = new WebInspector.Linkifier();
+    this._font = "11px " + WebInspector.fontFamily();
     this._filters = [];
     this.addFilter(WebInspector.TimelineUIUtils.hiddenEventsFilter());
     this.addFilter(new WebInspector.ExclusiveTraceEventNameFilter([WebInspector.TimelineModel.RecordType.Program]));
+    this._jsFramesColorGenerator = new WebInspector.FlameChart.ColorGenerator(
+        { min: 180, max: 310, count: 7 },
+        { min: 50, max: 80, count: 5 },
+        85);
+    this._consoleColorGenerator = new WebInspector.FlameChart.ColorGenerator(
+        { min: 30, max: 55, count: 5 },
+        { min: 70, max: 100, count: 6 },
+        50, 0.7);
 }
 
 WebInspector.TimelineFlameChartDataProvider.InstantEventVisibleDurationMs = 0.001;
 WebInspector.TimelineFlameChartDataProvider.JSFrameCoalesceThresholdMs = 1.1;
-
-/**
- * @return {!WebInspector.FlameChart.ColorGenerator}
- */
-WebInspector.TimelineFlameChartDataProvider.consoleEventsColorGenerator = function()
-{
-    if (!WebInspector.TimelineFlameChartDataProvider.consoleEventsColorGenerator._consoleEventsColorGenerator) {
-        var hueSpace = { min: 30, max: 55, count: 5 };
-        var satSpace = { min: 70, max: 100, count: 6 };
-        var colorGenerator = new WebInspector.FlameChart.ColorGenerator(hueSpace, satSpace, 50, 0.7);
-        WebInspector.TimelineFlameChartDataProvider.consoleEventsColorGenerator._consoleEventsColorGenerator = colorGenerator;
-    }
-    return WebInspector.TimelineFlameChartDataProvider.consoleEventsColorGenerator._consoleEventsColorGenerator;
-}
 
 WebInspector.TimelineFlameChartDataProvider.prototype = {
     /**
@@ -71,7 +64,7 @@ WebInspector.TimelineFlameChartDataProvider.prototype = {
      */
     barHeight: function()
     {
-        return 20;
+        return 17;
     },
 
     /**
@@ -80,7 +73,7 @@ WebInspector.TimelineFlameChartDataProvider.prototype = {
      */
     textBaseline: function()
     {
-        return 6;
+        return 5;
     },
 
     /**
@@ -89,7 +82,7 @@ WebInspector.TimelineFlameChartDataProvider.prototype = {
      */
     textPadding: function()
     {
-        return 5;
+        return 4;
     },
 
     /**
@@ -116,10 +109,10 @@ WebInspector.TimelineFlameChartDataProvider.prototype = {
 
             var name = WebInspector.TimelineUIUtils.eventStyle(event).title;
             // TODO(yurys): support event dividers
-            var details = WebInspector.TimelineUIUtils.buildDetailsNodeForTraceEvent(event, this._model.target(), this._linkifier);
-            if (event.name === WebInspector.TimelineModel.RecordType.JSFrame && details)
-                return details.textContent;
-            return details ? WebInspector.UIString("%s (%s)", name, details.textContent) : name;
+            var detailsText = WebInspector.TimelineUIUtils.buildDetailsTextForTraceEvent(event, this._model.target());
+            if (event.name === WebInspector.TimelineModel.RecordType.JSFrame && detailsText)
+                return detailsText;
+            return detailsText ? WebInspector.UIString("%s (%s)", name, detailsText) : name;
         }
         var title = this._entryIndexToTitle[entryIndex];
         if (!title) {
@@ -384,13 +377,15 @@ WebInspector.TimelineFlameChartDataProvider.prototype = {
     {
         var event = this._entryEvents[entryIndex];
         if (!event)
-            return this._entryIndexToFrame[entryIndex] ? "white" : "#555";
-        if (event.name === WebInspector.TimelineModel.RecordType.JSFrame)
-            return this._timelineData.entryLevels[entryIndex] % 2 ? "#efb320" : "#fcc02d";
+            return this._entryIndexToFrame[entryIndex] ? "white" : "#aaa";
+        if (event.name === WebInspector.TimelineModel.RecordType.JSFrame) {
+            var colorId = event.args["data"]["url"];
+            return this._jsFramesColorGenerator.colorForID(colorId);
+        }
         var category = WebInspector.TimelineUIUtils.eventStyle(event).category;
         if (WebInspector.TracingModel.isAsyncPhase(event.phase)) {
             if (event.category === WebInspector.TracingModel.ConsoleEventCategory)
-                return WebInspector.TimelineFlameChartDataProvider.consoleEventsColorGenerator().colorForID(event.name);
+                return this._consoleColorGenerator.colorForID(event.name);
             var color = this._asyncColorByCategory[category.name];
             if (color)
                 return color;
@@ -417,54 +412,37 @@ WebInspector.TimelineFlameChartDataProvider.prototype = {
     {
         var frame = this._entryIndexToFrame[entryIndex];
         if (frame) {
-            context.save();
-            context.translate(0.5, 0.5);
-            var padding = 4;
-            barX += padding;
-            barWidth -= 2 * padding;
-            barY += padding;
-            barHeight -= 2 * padding;
+            var /** @const */ vPadding = 1;
+            var /** @const */ hPadding = 2;
+            barX += hPadding;
+            barWidth -= 2 * hPadding;
+            barY += vPadding;
+            barHeight -= 2 * vPadding + 1;
 
-            var cornerRadis = 3;
-            var radiusY = cornerRadis;
-            var radiusX = Math.min(cornerRadis, barWidth / 2);
+            context.fillStyle = "#ccc";
+            context.fillRect(barX, barY, barWidth, barHeight);
 
-            context.beginPath();
-            context.moveTo(barX + radiusX, barY);
-            context.lineTo(barX + barWidth - radiusX, barY);
-            context.quadraticCurveTo(barX + barWidth, barY, barX + barWidth, barY + radiusY);
-            context.lineTo(barX + barWidth, barY + barHeight - radiusY);
-            context.quadraticCurveTo(barX + barWidth, barY + barHeight, barX + barWidth - radiusX, barY + barHeight);
-            context.lineTo(barX + radiusX, barY + barHeight);
-            context.quadraticCurveTo(barX, barY + barHeight, barX, barY + barHeight - radiusY);
-            context.lineTo(barX, barY + radiusY);
-            context.quadraticCurveTo(barX, barY, barX + radiusX, barY);
-            context.closePath();
+            // Draw frame perforation.
+            context.fillStyle = "white";
+            for (var i = 1; i < barWidth; i += 4) {
+                context.fillRect(barX + i, barY + 1, 2, 2);
+                context.fillRect(barX + i, barY + barHeight - 3, 2, 2);
+            }
 
-            context.fillStyle = "rgba(200, 200, 200, 0.8)";
-            context.fill();
-            context.strokeStyle = "rgba(150, 150, 150, 0.8)";
-            context.stroke();
-
-            var frameDurationText = Number.millisToString(frame.duration, true);
+            var frameDurationText = Number.preciseMillisToString(frame.duration, 1);
             var textWidth = context.measureText(frameDurationText).width;
             if (barWidth > textWidth) {
-                context.fillStyle = "#555";
-                context.fillText(frameDurationText, barX + ((barWidth - textWidth) >> 1), barY + barHeight - 2);
+                context.fillStyle = "#333";
+                context.fillText(frameDurationText, barX + ((barWidth - textWidth) >> 1), barY + barHeight - 3);
             }
-            context.restore();
             return true;
         }
         if (barWidth < 5)
             return false;
 
-        // Paint text using white color on dark background.
         if (text) {
             context.save();
-            context.fillStyle = "white";
-            context.shadowColor = "rgba(0, 0, 0, 0.1)";
-            context.shadowOffsetX = 1;
-            context.shadowOffsetY = 1;
+            context.fillStyle = "#333";
             context.font = this._font;
             context.fillText(text, barX + this.textPadding(), barY + barHeight - this.textBaseline());
             context.restore();
@@ -478,10 +456,11 @@ WebInspector.TimelineFlameChartDataProvider.prototype = {
             context.clip();
 
             context.beginPath();
+            var /** @const */ triangleSize = 10;
             context.fillStyle = "red";
-            context.moveTo(barX + barWidth - 15, barY + 1);
+            context.moveTo(barX + barWidth - triangleSize, barY + 1);
             context.lineTo(barX + barWidth - 1, barY + 1);
-            context.lineTo(barX + barWidth - 1, barY + 15);
+            context.lineTo(barX + barWidth - 1, barY + triangleSize);
             context.fill();
 
             context.restore();
