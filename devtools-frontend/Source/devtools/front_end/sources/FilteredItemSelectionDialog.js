@@ -580,7 +580,8 @@ WebInspector.JavaScriptOutlineDialog.prototype = {
             this._outlineWorker = new WorkerRuntime.Worker("script_formatter_worker");
             this._outlineWorker.onmessage = this._didBuildOutlineChunk.bind(this, uic, uiSourceCodes);
             function postMessage() {
-                this._outlineWorker.postMessage({ method: "javaScriptOutline", params: { content: uic.workingCopy() } });
+                var wc = uic.workingCopy();
+                this._outlineWorker.postMessage({ method: "javaScriptOutline", params: { content: (wc ? wc : "") }});
             }
             uic.requestContent(postMessage.bind(this));
         }
