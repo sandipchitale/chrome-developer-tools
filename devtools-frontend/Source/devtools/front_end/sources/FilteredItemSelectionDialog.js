@@ -563,12 +563,16 @@ WebInspector.JavaScriptOutlineDialog = function(uiSourceCode, allFiles, selectIt
  * @param {!WebInspector.View} view
  * @param {!WebInspector.UISourceCode} uiSourceCode
  * @param {function(number, number)} selectItemCallback
+ * @param {string} initialQuery
  */
-WebInspector.JavaScriptOutlineDialog.show = function(view, uiSourceCode, allFiles, selectItemCallback)
+WebInspector.JavaScriptOutlineDialog.show = function(view, uiSourceCode, allFiles, selectItemCallback, initialQuery)
 {
     if (WebInspector.Dialog.currentInstance())
         return;
     var filteredItemSelectionDialog = new WebInspector.FilteredItemSelectionDialog(new WebInspector.JavaScriptOutlineDialog(uiSourceCode, allFiles, selectItemCallback));
+    if (initialQuery) {
+        filteredItemSelectionDialog.setQuery(initialQuery);
+    }
     WebInspector.Dialog.show(view.element, filteredItemSelectionDialog);
 }
 

@@ -654,7 +654,20 @@ WebInspector.SourcesView.prototype = {
         switch (uiSourceCode.contentType()) {
         case WebInspector.resourceTypes.Document:
         case WebInspector.resourceTypes.Script:
-            WebInspector.JavaScriptOutlineDialog.show(this, uiSourceCode, allFiles, this.showSourceLocation.bind(this));
+            var sourceFrame = this.currentSourceFrame();
+            var selection = sourceFrame.textEditor.selection();
+            var startLine = selection.startLine;
+            var startColumn = selection.startColumn;
+            var line = sourceFrame.textEditor.line(startLine);
+            var token = sourceFrame.textEditor.tokenAtTextPosition(startLine, startColumn);
+            if (token && token.type &&
+                    ("js-variable" === token.type ||
+                     "js-variable-2" === token.type ||
+                     "js-property" === token.type ||
+                     "js-def" === token.type)) {
+                tokenText = line.substring(token.startColumn, token.endColumn);
+            }
+            WebInspector.JavaScriptOutlineDialog.show(this, uiSourceCode, allFiles, this.showSourceLocation.bind(this), tokenText);
             return true;
         case WebInspector.resourceTypes.Stylesheet:
             WebInspector.StyleSheetOutlineDialog.show(this, uiSourceCode, this.showSourceLocation.bind(this, uiSourceCode));
