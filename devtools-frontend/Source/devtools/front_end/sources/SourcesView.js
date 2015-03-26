@@ -654,6 +654,7 @@ WebInspector.SourcesView.prototype = {
         switch (uiSourceCode.contentType()) {
         case WebInspector.resourceTypes.Document:
         case WebInspector.resourceTypes.Script:
+            var tokenText;
             var sourceFrame = this.currentSourceFrame();
             var selection = sourceFrame.textEditor.selection();
             var startLine = selection.startLine;
