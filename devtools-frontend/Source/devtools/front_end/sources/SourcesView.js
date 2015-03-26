@@ -667,7 +667,8 @@ WebInspector.SourcesView.prototype = {
                      "js-property" === token.type ||
                      "js-def" === token.type)) {
                 tokenText = line.substring(token.startColumn, token.endColumn);
-            }
+            } else
+            	tokenText = undefined;
             WebInspector.JavaScriptOutlineDialog.show(this, uiSourceCode, allFiles, this.showSourceLocation.bind(this), tokenText);
             return true;
         case WebInspector.resourceTypes.Stylesheet:
